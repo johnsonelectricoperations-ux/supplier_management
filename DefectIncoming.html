@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>소재불량반입</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid #667eea;
+    }
+
+    .nav-menu {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 8px;
+    }
+
+    .nav-btn {
+      padding: 10px 20px;
+      border: none;
+      background: white;
+      color: #667eea;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .nav-btn:hover {
+      background: #f0f0f0;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .nav-btn.active {
+      background: #667eea;
+      color: white;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .section {
+      margin: 30px 0;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #667eea;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 15px;
+      align-items: center;
+    }
+
+    .form-group {
+      flex: 1;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+    }
+
+    .item-row {
+      background: white;
+      padding: 20px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      border: 2px solid #ddd;
+      position: relative;
+    }
+
+    .item-row-header {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+      align-items: flex-end;
+    }
+
+    .item-row-header > div {
+      flex: 1;
+    }
+
+    .item-row-header .btn-remove {
+      flex: 0 0 auto;
+      padding: 10px 20px;
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .item-row-header .btn-remove:hover {
+      background: #d32f2f;
+    }
+
+    /* TM-NO 자동완성 스타일 */
+    .autocomplete-wrapper {
+      position: relative;
+    }
+
+    .autocomplete-results {
+      position: absolute;
+      z-index: 1000;
+      width: 100%;
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      margin-top: 4px;
+      display: none;
+    }
+
+    .autocomplete-item {
+      padding: 12px 15px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.2s;
+    }
+
+    .autocomplete-item:hover {
+      background-color: #f0f4ff;
+    }
+
+    .autocomplete-item:last-child {
+      border-bottom: none;
+    }
+
+    .autocomplete-tmno {
+      font-weight: 600;
+      color: #667eea;
+      margin-bottom: 4px;
+    }
+
+    .autocomplete-product {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .defect-types-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 15px;
+      padding: 15px;
+      background: #f0f0f0;
+      border-radius: 5px;
+    }
+
+    .defect-type-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .defect-type-item label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #555;
+      margin-bottom: 5px;
+    }
+
+    .defect-type-item input {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .row-total {
+      text-align: right;
+      margin-top: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .btn-add-row {
+      width: 100%;
+      padding: 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .btn-add-row:hover {
+      background: #45a049;
+    }
+
+    .btn-save {
+      width: 100%;
+      padding: 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+
+    .btn-save:hover {
+      background: #5568d3;
+    }
+
+    #listContainer {
+      max-height: 350px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .list-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: white;
+    }
+
+    .list-table th,
+    .list-table td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    .list-table th {
+      background: #667eea;
+      color: white;
+      font-weight: bold;
+    }
+
+    .list-table tr:hover {
+      background: #f5f5f5;
+    }
+
+    .btn-print {
+      padding: 8px 16px;
+      background: #FF9800;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-print:hover {
+      background: #F57C00;
+    }
+
+    .btn-edit {
+      padding: 5px 10px;
+      margin-right: 5px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .btn-edit:hover {
+      background: #45a049;
+    }
+
+    .btn-delete {
+      padding: 5px 10px;
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .btn-delete:hover {
+      background: #d32f2f;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #667eea;
+      font-weight: bold;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 15px;
+      }
+
+      .nav-menu {
+        flex-direction: column;
+      }
+
+      .nav-btn {
+        width: 100%;
+      }
+
+      .form-row {
+        flex-direction: column;
+      }
+
+      .item-row-header {
+        flex-direction: column;
+      }
+
+      .defect-types-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media print {
+      .nav-menu,
+      .btn-add-row,
+      .btn-save,
+      .btn-remove,
+      .btn-print,
+      .btn-edit,
+      .btn-delete,
+      .section:first-of-type {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚠️ 소재불량반입</h1>
+
+    <!-- 내비게이션 메뉴 -->
+    <?!= include('Navigation') ?>
+
+    <!-- 입력 폼 -->
+    <div class="section">
+      <div class="section-title">소재불량반입 등록</div>
+
+      <!-- 상단 고정 입력 -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>반입예정일자 *</label>
+          <input type="date" id="incomingDate" required>
+        </div>
+        <div class="form-group">
+          <label>업체명</label>
+          <input type="text" id="companyName" readonly style="background: #f0f0f0;">
+        </div>
+      </div>
+
+      <!-- 아이템 행 컨테이너 -->
+      <div id="itemRowsContainer"></div>
+
+      <!-- 행 추가 버튼 -->
+      <button class="btn-add-row" onclick="addItemRow()">+ 행 추가</button>
+
+      <!-- 저장 버튼 -->
+      <button class="btn-save" onclick="saveDefectIncoming()">💾 저장</button>
+      <button class="btn-save" onclick="cancelEdit()" style="background: #999; margin-top: 10px; display: none;" id="btnCancel">❌ 취소</button>
+    </div>
+
+    <!-- 리스트 조회 -->
+    <div class="section">
+      <div class="section-title">소재불량반입 이력</div>
+
+      <!-- 날짜 선택 필터 -->
+      <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+        <label style="font-weight: bold;">반입예정일자:</label>
+        <select id="dateFilter" onchange="filterByDate()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+          <option value="">전체</option>
+        </select>
+        <button class="btn-print" onclick="printByDate()" style="margin-left: auto;">🖨️ 선택 날짜 출력</button>
+      </div>
+
+      <div id="listContainer">
+        <div class="loading">데이터를 불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 전역 변수
+    let sessionToken = null;
+    let currentUser = null;
+    let defectTypes = []; // 현재 업체의 불량유형
+    let allDefectTypesMap = {}; // 모든 불량유형 (코드 -> 이름 매핑)
+    let itemList = [];
+    let rowCounter = 0;
+    let dataLoadedFlags = { defectTypes: false, itemList: false };
+    let allDefectData = []; // 전체 소재불량반입 데이터
+    let allDefectHeaders = []; // 헤더 정보
+    let editingId = null; // 수정 중인 데이터의 식별ID (null이면 신규 작성)
+
+    // 안전한 네비게이션 함수
+    function safeNavigate(url, params) {
+      // Query string 생성
+      let fullUrl = url;
+      if (params) {
+        const queryString = Object.keys(params)
+          .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+          .join('&');
+        fullUrl = url + '?' + queryString;
+      }
+
+      // 방법 1: window.top.location.href 시도 (가장 선호)
+      try {
+        window.top.location.href = fullUrl;
+        return;
+      } catch (e) {
+        console.warn('window.top.location.href 실패, 다음 방법 시도:', e.message);
+      }
+
+      // 방법 2: window.location.replace 시도
+      try {
+        window.location.replace(fullUrl);
+        return;
+      } catch (e) {
+        console.warn('window.location.replace 실패, 다음 방법 시도:', e.message);
+      }
+
+      // 방법 3: meta refresh 태그 사용 (최후의 수단)
+      try {
+        const meta = document.createElement('meta');
+        meta.httpEquiv = 'refresh';
+        meta.content = '0; url=' + fullUrl;
+        document.head.appendChild(meta);
+        console.log('meta refresh 태그로 리다이렉트');
+      } catch (e) {
+        console.error('모든 리다이렉트 방법 실패:', e.message);
+        alert('페이지 이동에 실패했습니다. 수동으로 새로고침해주세요.');
+      }
+    }
+
+    // 로그인 페이지로 리다이렉트
+    function redirectToLogin() {
+      sessionStorage.removeItem('sessionToken');
+      safeNavigate('<?= getWebAppUrl() ?>', null);
+    }
+
+    // 토큰 초기화
+    function initToken() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token');
+
+      if (urlToken) {
+        sessionStorage.setItem('sessionToken', urlToken);
+        sessionToken = urlToken;
+      } else {
+        sessionToken = sessionStorage.getItem('sessionToken');
+      }
+
+      if (!sessionToken) {
+        redirectToLogin();
+      }
+    }
+
+    // 페이지 로드 시 초기화
+    window.onload = function() {
+      initToken();
+      loadUserInfo();
+    };
+
+    // 사용자 정보 로드
+    function loadUserInfo() {
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (!response || !response.success) {
+            alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+            logout();
+            return;
+          }
+
+          const user = response.user;
+          currentUser = user;
+          document.getElementById('companyName').value = user.companyName;
+
+          // 오늘 날짜 기본 설정
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('incomingDate').value = today;
+
+          // 네비게이션 초기화
+          initNavigation('defect-incoming', user.role);
+
+          // 데이터 로드
+          loadDefectTypes();
+          loadAllDefectTypes(); // 모든 불량유형 로드 (출력용)
+          loadItemList();
+          loadDefectIncomingList();
+        })
+        .withFailureHandler(function(error) {
+          console.error('사용자 정보 로드 실패:', error);
+          alert('사용자 정보를 불러올 수 없습니다.');
+        })
+        .getUserInfo(sessionToken);
+    }
+
+    // 데이터 준비 완료 체크
+    function checkDataReady() {
+      if (dataLoadedFlags.defectTypes && dataLoadedFlags.itemList) {
+        // 모든 데이터가 준비되면 첫 행 추가
+        addItemRow();
+      }
+    }
+
+    // 불량유형 로드
+    function loadDefectTypes() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            defectTypes = result.defectTypes;
+            dataLoadedFlags.defectTypes = true;
+            checkDataReady();
+          } else {
+            alert('불량유형을 불러올 수 없습니다: ' + result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('불량유형 로드 실패:', error);
+          alert('불량유형 로드 중 오류가 발생했습니다.');
+        })
+        .getDefectTypesForCompany(sessionToken);
+    }
+
+    // 모든 불량유형 로드 (출력용)
+    function loadAllDefectTypes() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            // 코드 -> 이름 매핑 생성
+            allDefectTypesMap = {};
+            result.defectTypes.forEach(dt => {
+              allDefectTypesMap[dt.code] = dt.name;
+            });
+          } else {
+            console.error('모든 불량유형 로드 실패:', result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('모든 불량유형 로드 실패:', error);
+        })
+        .getAllDefectTypes();
+    }
+
+    // Item 목록 로드
+    function loadItemList() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            itemList = result.items;
+            dataLoadedFlags.itemList = true;
+            checkDataReady();
+          } else {
+            alert('Item 목록을 불러올 수 없습니다: ' + result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Item 목록 로드 실패:', error);
+          alert('Item 목록 로드 중 오류가 발생했습니다.');
+        })
+        .getItemListForDefect(sessionToken);
+    }
+
+    // 행 추가
+    function addItemRow() {
+      rowCounter++;
+      const rowId = 'row_' + rowCounter;
+
+      const rowHtml = `
+        <div class="item-row" id="${rowId}">
+          <div class="item-row-header">
+            <div class="autocomplete-wrapper">
+              <label>TM-NO *</label>
+              <input type="text" id="${rowId}_tmNo" placeholder="TM-NO를 입력하세요" required autocomplete="off">
+              <div id="${rowId}_autocomplete" class="autocomplete-results"></div>
+            </div>
+            <div>
+              <label>품명</label>
+              <input type="text" id="${rowId}_itemName" readonly style="background: #f0f0f0;">
+            </div>
+            <div>
+              <label>구분 *</label>
+              <select id="${rowId}_category" required>
+                <option value="">선택하세요</option>
+                <option value="미가공">미가공</option>
+                <option value="1차가공">1차가공</option>
+                <option value="2차가공">2차가공</option>
+              </select>
+            </div>
+            <button class="btn-remove" onclick="removeItemRow('${rowId}')">삭제</button>
+          </div>
+
+          <div>
+            <label style="font-weight: bold; color: #555; margin-bottom: 10px; display: block;">불량유형별 수량</label>
+            <div class="defect-types-grid" id="${rowId}_defects">
+              ${defectTypes.map(dt => `
+                <div class="defect-type-item">
+                  <label>${dt.name}</label>
+                  <input type="number" id="${rowId}_${dt.code}" value="" min="0" onchange="calculateRowTotal('${rowId}')">
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="row-total">
+            행 합계: <span id="${rowId}_total">0</span>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('itemRowsContainer').insertAdjacentHTML('beforeend', rowHtml);
+
+      // TM-NO 자동완성 설정
+      setupTmNoAutocomplete(rowId);
+    }
+
+    // TM-NO 자동완성 설정
+    let searchTimeouts = {};
+
+    function setupTmNoAutocomplete(rowId) {
+      const tmNoInput = document.getElementById(rowId + '_tmNo');
+      const autocompleteDiv = document.getElementById(rowId + '_autocomplete');
+      const itemNameInput = document.getElementById(rowId + '_itemName');
+
+      tmNoInput.addEventListener('input', function(e) {
+        const searchText = e.target.value.trim();
+
+        // 검색어가 없으면 자동완성 숨김
+        if (searchText.length === 0) {
+          autocompleteDiv.style.display = 'none';
+          itemNameInput.value = '';
+          return;
+        }
+
+        // 디바운싱 (300ms 대기)
+        if (searchTimeouts[rowId]) {
+          clearTimeout(searchTimeouts[rowId]);
+        }
+
+        searchTimeouts[rowId] = setTimeout(function() {
+          // 서버에서 TM-NO 검색
+          google.script.run
+            .withSuccessHandler(function(response) {
+              if (response.success && response.items && response.items.length > 0) {
+                displayAutocompleteResults(rowId, response.items);
+              } else {
+                autocompleteDiv.style.display = 'none';
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.error('TM-NO 검색 실패:', error);
+              autocompleteDiv.style.display = 'none';
+            })
+            .searchTmNo(sessionToken, searchText);
+        }, 300);
+      });
+
+      // 외부 클릭 시 자동완성 숨김
+      document.addEventListener('click', function(e) {
+        if (e.target !== tmNoInput && !autocompleteDiv.contains(e.target)) {
+          autocompleteDiv.style.display = 'none';
+        }
+      });
+    }
+
+    // 자동완성 결과 표시
+    function displayAutocompleteResults(rowId, items) {
+      const autocompleteDiv = document.getElementById(rowId + '_autocomplete');
+      const tmNoInput = document.getElementById(rowId + '_tmNo');
+      const itemNameInput = document.getElementById(rowId + '_itemName');
+
+      autocompleteDiv.innerHTML = '';
+
+      items.forEach(function(item) {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'autocomplete-item';
+        itemDiv.innerHTML = `
+          <div class="autocomplete-tmno">${item.tmNo}</div>
+          <div class="autocomplete-product">${item.productName}</div>
+        `;
+
+        itemDiv.addEventListener('click', function() {
+          // TM-NO와 품명 자동 입력
+          tmNoInput.value = item.tmNo;
+          itemNameInput.value = item.productName;
+          autocompleteDiv.style.display = 'none';
+        });
+
+        autocompleteDiv.appendChild(itemDiv);
+      });
+
+      autocompleteDiv.style.display = 'block';
+    }
+
+    // 행 합계 계산
+    function calculateRowTotal(rowId) {
+      let total = 0;
+      defectTypes.forEach(dt => {
+        const input = document.getElementById(rowId + '_' + dt.code);
+        if (input) {
+          total += parseInt(input.value) || 0;
+        }
+      });
+      document.getElementById(rowId + '_total').textContent = total;
+    }
+
+    // 행 삭제
+    function removeItemRow(rowId) {
+      if (confirm('이 행을 삭제하시겠습니까?')) {
+        document.getElementById(rowId).remove();
+      }
+    }
+
+    // 저장
+    function saveDefectIncoming() {
+      const incomingDate = document.getElementById('incomingDate').value;
+
+      if (!incomingDate) {
+        alert('반입예정일자를 선택하세요.');
+        return;
+      }
+
+      // 행 데이터 수집
+      const rows = [];
+      const itemRows = document.querySelectorAll('.item-row');
+
+      if (itemRows.length === 0) {
+        alert('최소 1개 이상의 항목을 입력하세요.');
+        return;
+      }
+
+      // 수정 모드일 때는 1개 행만 허용
+      if (editingId && itemRows.length > 1) {
+        alert('수정 모드에서는 1개 항목만 수정할 수 있습니다.');
+        return;
+      }
+
+      for (let i = 0; i < itemRows.length; i++) {
+        const row = itemRows[i];
+        const rowId = row.id;
+
+        const tmNo = document.getElementById(rowId + '_tmNo').value;
+        const itemName = document.getElementById(rowId + '_itemName').value;
+        const category = document.getElementById(rowId + '_category').value;
+
+        if (!tmNo || !category) {
+          alert((i + 1) + '번째 행의 필수 항목을 모두 입력하세요.');
+          return;
+        }
+
+        // TM-NO에 대한 품명이 자동으로 채워지지 않은 경우 (등록되지 않은 TM-NO)
+        if (!itemName || itemName.trim() === '') {
+          alert((i + 1) + '번째 행의 TM-NO가 등록되지 않았습니다.\n등록된 TM-NO를 입력하세요.');
+          return;
+        }
+
+        // 불량유형별 수량 수집
+        const defects = {};
+        let hasQty = false;
+        defectTypes.forEach(dt => {
+          const qty = parseInt(document.getElementById(rowId + '_' + dt.code).value) || 0;
+          defects[dt.code] = qty;
+          if (qty > 0) hasQty = true;
+        });
+
+        if (!hasQty) {
+          alert((i + 1) + '번째 행의 불량수량을 최소 1개 이상 입력하세요.');
+          return;
+        }
+
+        rows.push({
+          tmNo: tmNo,
+          itemName: itemName,
+          category: category,
+          defects: defects
+        });
+      }
+
+      // 수정 모드일 때는 updateDefectIncoming 호출
+      if (editingId) {
+        const data = {
+          incomingDate: incomingDate,
+          tmNo: rows[0].tmNo,
+          itemName: rows[0].itemName,
+          category: rows[0].category,
+          defects: rows[0].defects
+        };
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert(result.message);
+              // 수정 모드 해제
+              cancelEdit();
+              // 리스트 새로고침
+              loadDefectIncomingList();
+            } else {
+              alert('수정 실패: ' + result.message);
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('수정 실패:', error);
+            alert('수정 중 오류가 발생했습니다.');
+          })
+          .updateDefectIncoming(sessionToken, editingId, data);
+      } else {
+        // 신규 저장 모드
+        const data = {
+          incomingDate: incomingDate,
+          rows: rows
+        };
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              alert(result.message);
+              // 폼 초기화
+              document.getElementById('itemRowsContainer').innerHTML = '';
+              rowCounter = 0;
+              addItemRow();
+              // 리스트 새로고침
+              loadDefectIncomingList();
+            } else {
+              alert('저장 실패: ' + result.message);
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('저장 실패:', error);
+            alert('저장 중 오류가 발생했습니다.');
+          })
+          .saveDefectIncoming(sessionToken, data);
+      }
+    }
+
+    // 수정 버튼 클릭
+    function editDefectRow(id) {
+      if (!id) {
+        alert('유효하지 않은 데이터입니다.');
+        return;
+      }
+
+      // 서버에서 해당 ID의 전체 데이터 조회
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            // 수정 모드로 전환
+            editingId = id;
+            populateFormWithData(result.data);
+
+            // 저장 버튼 텍스트 변경 및 취소 버튼 표시
+            document.querySelector('.btn-save').textContent = '✏️ 수정';
+            document.getElementById('btnCancel').style.display = 'block';
+
+            // 화면을 폼 영역으로 스크롤
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            alert('데이터 조회 실패: ' + result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('데이터 조회 실패:', error);
+          alert('데이터를 불러올 수 없습니다.');
+        })
+        .getDefectIncomingById(sessionToken, id);
+    }
+
+    // 폼에 데이터 채우기
+    function populateFormWithData(data) {
+      // 반입예정일자 설정
+      document.getElementById('incomingDate').value = data['반입예정일자'] || '';
+
+      // 기존 행 모두 제거
+      document.getElementById('itemRowsContainer').innerHTML = '';
+      rowCounter = 0;
+
+      // 새 행 추가
+      addItemRow();
+      const rowId = 'row_1';
+
+      // TM-NO, 품명, 구분 설정
+      document.getElementById(rowId + '_tmNo').value = data['TM-NO'] || '';
+      document.getElementById(rowId + '_itemName').value = data['품명'] || '';
+      document.getElementById(rowId + '_category').value = data['구분'] || '';
+
+      // 불량유형별 수량 설정
+      defectTypes.forEach(dt => {
+        const input = document.getElementById(rowId + '_' + dt.code);
+        if (input && data[dt.code] !== undefined) {
+          input.value = data[dt.code] || 0;
+        }
+      });
+
+      // 합계 재계산
+      calculateRowTotal(rowId);
+    }
+
+    // 삭제 버튼 클릭
+    function deleteDefectRow(id) {
+      if (!id) {
+        alert('유효하지 않은 데이터입니다.');
+        return;
+      }
+
+      if (!confirm('정말 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+        return;
+      }
+
+      // 서버에 삭제 요청
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            alert(result.message);
+            // 리스트 새로고침
+            loadDefectIncomingList();
+          } else {
+            alert('삭제 실패: ' + result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('삭제 실패:', error);
+          alert('삭제 중 오류가 발생했습니다.');
+        })
+        .deleteDefectIncoming(sessionToken, id);
+    }
+
+    // 수정 취소
+    function cancelEdit() {
+      editingId = null;
+      document.querySelector('.btn-save').textContent = '💾 저장';
+      document.getElementById('btnCancel').style.display = 'none';
+      // 폼 초기화
+      document.getElementById('itemRowsContainer').innerHTML = '';
+      rowCounter = 0;
+      addItemRow();
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('incomingDate').value = today;
+    }
+
+    // 리스트 조회
+    function loadDefectIncomingList() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('리스트 조회 결과:', result);
+
+          // null 체크 추가
+          if (!result) {
+            console.error('서버에서 null 응답을 받았습니다.');
+            document.getElementById('listContainer').innerHTML =
+              '<div class="loading" style="color: #f44336;">서버 응답 오류가 발생했습니다.</div>';
+            return;
+          }
+
+          if (result.success) {
+            displayDefectIncomingList(result.data, result.headers);
+          } else {
+            document.getElementById('listContainer').innerHTML =
+              '<div class="loading" style="color: #f44336;">리스트 조회 실패: ' + result.message + '</div>';
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('리스트 조회 실패:', error);
+          document.getElementById('listContainer').innerHTML =
+            '<div class="loading" style="color: #f44336;">리스트 조회 중 오류가 발생했습니다: ' + error.message + '</div>';
+        })
+        .getDefectIncomingList(sessionToken);
+    }
+
+    // 리스트 표시
+    function displayDefectIncomingList(data, headers) {
+      // 전역 변수에 저장
+      allDefectData = data;
+      allDefectHeaders = headers;
+
+      if (data.length === 0) {
+        document.getElementById('listContainer').innerHTML =
+          '<div class="loading">등록된 소재불량반입 데이터가 없습니다.</div>';
+        document.getElementById('dateFilter').innerHTML = '<option value="">전체</option>';
+        return;
+      }
+
+      // 날짜 목록 추출 (중복 제거)
+      const dates = [...new Set(data.map(row => row['반입예정일자']))].filter(d => d).sort().reverse();
+
+      // 날짜 필터 옵션 생성
+      let dateFilterHtml = '<option value="">전체</option>';
+      dates.forEach(date => {
+        dateFilterHtml += '<option value="' + date + '">' + date + '</option>';
+      });
+      document.getElementById('dateFilter').innerHTML = dateFilterHtml;
+
+      // 주요 컬럼만 표시 + 작업 버튼 추가
+      const displayHeaders = ['식별ID', '반입예정일자', 'TM-NO', '품명', '구분', '합계', '작업'];
+
+      let tableHtml = '<table class="list-table"><thead><tr>';
+      displayHeaders.forEach(h => {
+        tableHtml += '<th>' + h + '</th>';
+      });
+      tableHtml += '</tr></thead><tbody>';
+
+      data.forEach(row => {
+        tableHtml += '<tr>';
+        displayHeaders.forEach(h => {
+          if (h === '작업') {
+            // 수정/삭제 버튼 추가
+            const id = row['식별ID'] || '';
+            tableHtml += '<td>';
+            tableHtml += '<button class="btn-edit" onclick="editDefectRow(\'' + id + '\')">수정</button>';
+            tableHtml += '<button class="btn-delete" onclick="deleteDefectRow(\'' + id + '\')">삭제</button>';
+            tableHtml += '</td>';
+          } else {
+            tableHtml += '<td>' + (row[h] || '') + '</td>';
+          }
+        });
+        tableHtml += '</tr>';
+      });
+
+      tableHtml += '</tbody></table>';
+      document.getElementById('listContainer').innerHTML = tableHtml;
+    }
+
+    // 날짜별 필터링
+    function filterByDate() {
+      const selectedDate = document.getElementById('dateFilter').value;
+
+      let filteredData = allDefectData;
+      if (selectedDate) {
+        filteredData = allDefectData.filter(row => row['반입예정일자'] === selectedDate);
+      }
+
+      // 테이블만 다시 그리기
+      const displayHeaders = ['식별ID', '반입예정일자', 'TM-NO', '품명', '구분', '합계', '작업'];
+
+      let tableHtml = '<table class="list-table"><thead><tr>';
+      displayHeaders.forEach(h => {
+        tableHtml += '<th>' + h + '</th>';
+      });
+      tableHtml += '</tr></thead><tbody>';
+
+      filteredData.forEach(row => {
+        tableHtml += '<tr>';
+        displayHeaders.forEach(h => {
+          if (h === '작업') {
+            // 수정/삭제 버튼 추가
+            const id = row['식별ID'] || '';
+            tableHtml += '<td>';
+            tableHtml += '<button class="btn-edit" onclick="editDefectRow(\'' + id + '\')">수정</button>';
+            tableHtml += '<button class="btn-delete" onclick="deleteDefectRow(\'' + id + '\')">삭제</button>';
+            tableHtml += '</td>';
+          } else {
+            tableHtml += '<td>' + (row[h] || '') + '</td>';
+          }
+        });
+        tableHtml += '</tr>';
+      });
+
+      tableHtml += '</tbody></table>';
+      document.getElementById('listContainer').innerHTML = tableHtml;
+    }
+
+    // 날짜별 출력
+    function printByDate() {
+      const selectedDate = document.getElementById('dateFilter').value;
+
+      if (!selectedDate) {
+        alert('출력할 날짜를 선택하세요.');
+        return;
+      }
+
+      // 선택한 날짜의 데이터 필터링
+      const filteredData = allDefectData.filter(row => row['반입예정일자'] === selectedDate);
+
+      if (filteredData.length === 0) {
+        alert('선택한 날짜에 해당하는 데이터가 없습니다.');
+        return;
+      }
+
+      // 불량유형 컬럼 찾기 (H열부터) - 코드
+      const allDefectColumns = allDefectHeaders.slice(7).filter(h => h && h.trim());
+
+      // 현재 그룹의 불량유형 코드만 추출
+      const myDefectCodes = defectTypes.map(dt => dt.code);
+
+      // 현재 그룹의 불량유형만 필터링
+      const defectColumns = allDefectColumns.filter(code => myDefectCodes.includes(code));
+
+      console.log('출력 대상 불량유형:', defectColumns);
+
+      // 출력용 HTML 생성
+      let printHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>소재불량반입 내역</title>
+          <style>
+            @page {
+              size: landscape;
+            }
+            body {
+              font-family: 'Malgun Gothic', sans-serif;
+              padding: 20px;
+            }
+            h2 {
+              text-align: center;
+              margin-bottom: 10px;
+            }
+            .info {
+              text-align: center;
+              margin-bottom: 20px;
+              font-size: 14px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              table-layout: fixed;
+            }
+            th, td {
+              border: 1px solid #000;
+              padding: 8px;
+              text-align: center;
+              font-size: 12px;
+              word-wrap: break-word;
+            }
+            th {
+              background: #f0f0f0;
+              font-weight: bold;
+            }
+            /* 불량유형 컬럼 헤더만 글자 크기 60% */
+            th:nth-child(n+4):not(:last-child) {
+              font-size: 7.2px; /* 12px * 0.6 */
+            }
+            .total-row {
+              font-weight: bold;
+              background: #fffacd;
+            }
+            @media print {
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h2>소재불량반입 내역</h2>
+          <div class="info">
+            <div>반입예정일자: ${selectedDate}</div>
+            <div>업체명: ${currentUser ? currentUser.companyName : ''}</div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>TM-NO</th>
+                <th>품명</th>
+                <th>구분</th>
+                ${defectColumns.map(code => '<th>' + (allDefectTypesMap[code] || code) + '</th>').join('')}
+                <th>합계</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      // 각 행 데이터 추가
+      const totals = {}; // 불량유형별 합계
+      let grandTotal = 0; // 전체 합계
+
+      filteredData.forEach(row => {
+        printHtml += '<tr>';
+        printHtml += '<td>' + (row['TM-NO'] || '') + '</td>';
+        printHtml += '<td>' + (row['품명'] || '') + '</td>';
+        printHtml += '<td>' + (row['구분'] || '') + '</td>';
+
+        defectColumns.forEach(col => {
+          const value = parseInt(row[col]) || 0;
+          printHtml += '<td>' + value + '</td>';
+          totals[col] = (totals[col] || 0) + value;
+        });
+
+        const rowTotal = parseInt(row['합계']) || 0;
+        printHtml += '<td>' + rowTotal + '</td>';
+        grandTotal += rowTotal;
+
+        printHtml += '</tr>';
+      });
+
+      // 합계 행 추가
+      printHtml += '<tr class="total-row">';
+      printHtml += '<td colspan="3">합계</td>';
+      defectColumns.forEach(col => {
+        printHtml += '<td>' + (totals[col] || 0) + '</td>';
+      });
+      printHtml += '<td>' + grandTotal + '</td>';
+      printHtml += '</tr>';
+
+      printHtml += `
+            </tbody>
+          </table>
+
+          <div style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print()" style="padding: 10px 20px; font-size: 14px; cursor: pointer;">인쇄</button>
+            <button onclick="window.close()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; margin-left: 10px;">닫기</button>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // 새 창에서 출력
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+    }
+
+    // 네비게이션 초기화
+    function initNavigation(currentPage, userRole) {
+      const defectIncomingBtn = document.getElementById('navDefectIncoming');
+      if (defectIncomingBtn) {
+        defectIncomingBtn.classList.add('active');
+      }
+
+      const itemBtn = document.getElementById('navItem');
+      if (itemBtn) {
+        itemBtn.style.display = 'inline-block';
+      }
+
+      const inspectionResultBtn = document.getElementById('navInspectionResult');
+      if (inspectionResultBtn) {
+        inspectionResultBtn.style.display = (userRole === '관리자' || userRole === 'JEO') ? 'inline-block' : 'none';
+      }
+
+      const inspectionHistoryBtn = document.getElementById('navInspectionHistory');
+      if (inspectionHistoryBtn) {
+        inspectionHistoryBtn.style.display = (userRole === '관리자' || userRole === 'JEO') ? 'inline-block' : 'none';
+      }
+
+      const defectIncomingNavBtn = document.getElementById('navDefectIncoming');
+      if (defectIncomingNavBtn) {
+        defectIncomingNavBtn.style.display = 'inline-block';
+      }
+
+      const entryBtn = document.getElementById('navEntry');
+      if (entryBtn) {
+        entryBtn.style.display = (userRole === 'JEO') ? 'none' : 'inline-block';
+      }
+
+      const historyBtn = document.getElementById('navHistory');
+      if (historyBtn) {
+        historyBtn.style.display = (userRole === 'JEO') ? 'none' : 'inline-block';
+      }
+
+      const certificateBtn = document.getElementById('navCertificate');
+      if (certificateBtn) {
+        certificateBtn.style.display = (userRole === 'JEO') ? 'none' : 'inline-block';
+      }
+
+      const usersBtn = document.getElementById('navUsers');
+      if (usersBtn) {
+        usersBtn.style.display = (userRole === '관리자') ? 'inline-block' : 'none';
+      }
+
+      const navMenu = document.getElementById('navMenu');
+      if (navMenu) {
+        navMenu.style.opacity = '1';
+      }
+    }
+
+    // 페이지 이동
+    function goToPage(page) {
+      const token = sessionStorage.getItem('sessionToken');
+      const webAppUrl = '<?= getWebAppUrl() ?>';
+      safeNavigate(webAppUrl, {
+        'page': page,
+        'token': token,
+        't': Date.now()
+      });
+    }
+
+    // Item 클릭 핸들러
+    function handleItemClick() {
+      goToPage('dashboard');
+    }
+
+    // 검사결과등록 모달 (Dashboard에서만 사용)
+    function showInspectionResultModal() {
+      goToPage('dashboard');
+    }
+
+    // 로그아웃
+    function logout() {
+      if (confirm('로그아웃하시겠습니까?')) {
+        google.script.run
+          .withSuccessHandler(function() {
+            sessionStorage.removeItem('sessionToken');
+            redirectToLogin();
+          })
+          .logout(sessionStorage.getItem('sessionToken'));
+      }
+    }
+  </script>
+</body>
+</html>
