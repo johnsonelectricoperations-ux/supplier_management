@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>연락처 정보 - 검사성적서 관리</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px 30px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .company-name {
+      color: #ff6b35;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .header-title h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+
+    .header-title p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: white;
+      border: 2px solid white;
+    }
+
+    .btn-outline:hover {
+      background: white;
+      color: #667eea;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+
+    .nav-menu {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      padding: 12px 24px;
+      background: #f0f4ff;
+      color: #667eea;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .nav-btn:hover {
+      background: #667eea;
+      color: white;
+      transform: translateY(-2px);
+    }
+
+    .nav-btn.active {
+      background: #667eea;
+      color: white;
+    }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 5px;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .form-control:disabled {
+      background-color: #f5f5f5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      padding: 12px 30px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+    }
+
+    .table-responsive {
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+    }
+
+    thead {
+      background-color: #f8f9fa;
+    }
+
+    th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #555;
+      border-bottom: 2px solid #e0e0e0;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+
+    tbody tr:hover {
+      background-color: #f8f9fa;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+
+    .info-box p {
+      margin: 0;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+
+    .btn-edit {
+      background: #ffc107;
+      color: white;
+    }
+
+    .btn-edit:hover {
+      background: #ffb300;
+    }
+
+    .btn-delete {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-delete:hover {
+      background: #d32f2f;
+    }
+
+    @media (max-width: 768px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-content">
+      <div class="header-title">
+        <div class="company-name">Johnson Electric Operations</div>
+        <h1>협력사 수입검사 관리</h1>
+        <p id="userInfo">로딩 중...</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-outline" onclick="logout()">로그아웃</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <?!= include('Navigation') ?>
+
+    <!-- 일반 사용자용 폼 -->
+    <div id="userFormSection" class="section" style="display: none;">
+      <h2 class="section-title">비상연락망 정보 등록/수정</h2>
+
+      <div class="info-box">
+        <p>📞 품질 담당자의 비상연락망 정보를 등록해주세요. 등록된 정보는 긴급 상황 시 연락용으로 사용됩니다.</p>
+      </div>
+
+      <form id="contactForm">
+        <div class="form-group">
+          <label class="form-label">업체명</label>
+          <input type="text" class="form-control" id="companyName" disabled>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">품질담당자 성명 <span style="color: red;">*</span></label>
+            <input type="text" class="form-control" id="contactName" placeholder="담당자 성명을 입력하세요" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">연락처 <span style="color: red;">*</span></label>
+            <input type="tel" class="form-control" id="phone" placeholder="예: 010-1234-5678" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">이메일 주소 <span style="color: red;">*</span></label>
+          <input type="email" class="form-control" id="email" placeholder="예: contact@company.com" required>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+          <button type="submit" class="btn-primary">💾 저장</button>
+        </div>
+      </form>
+
+      <!-- 일반 사용자용 등록 정보 표시 -->
+      <div id="userContactTable" style="margin-top: 30px; display: none;">
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 15px; color: #333;">등록된 연락처 정보</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>품질담당자</th>
+                <th>연락처</th>
+                <th>이메일</th>
+                <th>등록일</th>
+                <th>작업</th>
+              </tr>
+            </thead>
+            <tbody id="userContactTableBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 관리자/JEO용 테이블 -->
+    <div id="adminTableSection" class="section" style="display: none;">
+      <h2 class="section-title">전체 비상연락망 정보</h2>
+
+      <div class="info-box">
+        <p>📋 등록된 모든 업체의 비상연락망 정보를 확인할 수 있습니다.</p>
+      </div>
+
+      <div id="tableContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== 토큰 관리 =====
+    let sessionToken = null;
+    let currentUser = null;
+
+    // 토큰 초기화
+    function initToken() {
+      const serverToken = '<?!= token ?>';
+
+      if (serverToken && serverToken !== 'undefined' && serverToken.length > 10) {
+        sessionToken = serverToken;
+        sessionStorage.setItem('sessionToken', serverToken);
+      } else {
+        sessionToken = sessionStorage.getItem('sessionToken');
+      }
+
+      if (!sessionToken) {
+        redirectToLogin();
+      }
+
+      return sessionToken;
+    }
+
+    // 페이지 이동 (폴백 리다이렉트)
+    function safeNavigate(url, params) {
+      let fullUrl = url;
+      if (params) {
+        const queryString = Object.keys(params)
+          .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+          .join('&');
+        fullUrl = url + '?' + queryString;
+      }
+
+      try {
+        window.top.location.href = fullUrl;
+        return;
+      } catch (e) {
+        console.warn('window.top.location.href 실패, 다음 방법 시도:', e.message);
+      }
+
+      try {
+        window.location.replace(fullUrl);
+        return;
+      } catch (e) {
+        console.warn('window.location.replace 실패, 다음 방법 시도:', e.message);
+      }
+
+      try {
+        const meta = document.createElement('meta');
+        meta.httpEquiv = 'refresh';
+        meta.content = '0; url=' + fullUrl;
+        document.head.appendChild(meta);
+      } catch (e) {
+        console.error('모든 리다이렉트 방법 실패:', e.message);
+        alert('페이지 이동에 실패했습니다. 수동으로 새로고침해주세요.');
+      }
+    }
+
+    function redirectToLogin() {
+      sessionStorage.removeItem('sessionToken');
+      safeNavigate('https://script.google.com/macros/s/AKfycbxpjukKc_G4SaPL52w47ANnQc8MvCmkP6IzUX8DaXBqqdz_L8Th3kLqv4_HdslfGnxIBw/exec', null);
+    }
+
+    function goToPage(page) {
+      const token = sessionStorage.getItem('sessionToken');
+      const webAppUrl = '<?= getWebAppUrl() ?>';
+      safeNavigate(webAppUrl, {
+        'page': page,
+        'token': token,
+        't': Date.now()
+      });
+    }
+
+    // 검사결과등록 모달 (Dashboard로 이동하면서 자동 열기)
+    function showInspectionResultModal() {
+      const token = sessionStorage.getItem('sessionToken');
+      const webAppUrl = '<?= getWebAppUrl() ?>';
+      safeNavigate(webAppUrl, {
+        'page': 'dashboard',
+        'token': token,
+        'openInspectionModal': 'true',
+        't': Date.now()
+      });
+    }
+
+    // 페이지 로드
+    window.onload = function() {
+      initToken();
+      loadUserInfo();
+    };
+
+    // 네비게이션 초기화
+    function initNavigation(currentPage, userRole) {
+      const navButtons = {
+        'dashboard': 'navDashboard',
+        'entry': 'navEntry',
+        'history': 'navHistory',
+        'certificate': 'navCertificate',
+        'contact': 'navContact'
+      };
+
+      if (navButtons[currentPage]) {
+        const btn = document.getElementById(navButtons[currentPage]);
+        if (btn) {
+          btn.classList.add('active');
+        }
+      }
+
+      // Item 등록 버튼은 대시보드에서만 표시
+      const itemBtn = document.getElementById('navItem');
+      if (itemBtn) {
+        itemBtn.style.display = 'none';
+      }
+
+      // 검사결과등록 버튼은 관리자 또는 JEO만 표시
+      const inspectionResultBtn = document.getElementById('navInspectionResult');
+      if (inspectionResultBtn) {
+        inspectionResultBtn.style.display = (userRole === '관리자' || userRole === 'JEO') ? 'inline-block' : 'none';
+      }
+
+      // 검사결과이력 버튼은 관리자 또는 JEO만 표시
+      const inspectionHistoryBtn = document.getElementById('navInspectionHistory');
+      if (inspectionHistoryBtn) {
+        inspectionHistoryBtn.style.display = (userRole === '관리자' || userRole === 'JEO') ? 'inline-block' : 'none';
+      }
+
+      // JEO는 성적서입력, 이력관리, 확인증출력 버튼 숨김
+      const entryBtn = document.getElementById('navEntry');
+      if (entryBtn) {
+        entryBtn.style.display = (userRole === 'JEO') ? 'none' : 'inline-block';
+      }
+
+      const historyBtn = document.getElementById('navHistory');
+      if (historyBtn) {
+        historyBtn.style.display = (userRole === 'JEO') ? 'none' : 'inline-block';
+      }
+
+      const certificateBtn = document.getElementById('navCertificate');
+      if (certificateBtn) {
+        certificateBtn.style.display = (userRole === 'JEO') ? 'none' : 'inline-block';
+      }
+
+      // 사용자 관리 버튼은 관리자만 표시
+      const usersBtn = document.getElementById('navUsers');
+      if (usersBtn) {
+        usersBtn.style.display = (userRole === '관리자') ? 'inline-block' : 'none';
+      }
+
+      const navMenu = document.getElementById('navMenu');
+      if (navMenu) {
+        navMenu.style.opacity = '1';
+      }
+    }
+
+    function handleItemClick() {
+      goToPage('dashboard');
+    }
+
+    // 사용자 정보 로드
+    function loadUserInfo() {
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            const user = response.user;
+            currentUser = user;
+            document.getElementById('userInfo').textContent =
+              user.companyName + ' | ' + user.name + ' (' + user.role + ')';
+            initNavigation('contact', user.role);
+
+            // 권한에 따라 폼/테이블 표시
+            if (user.role === '관리자' || user.role === 'JEO') {
+              document.getElementById('adminTableSection').style.display = 'block';
+              loadAllContactInfo();
+            } else {
+              document.getElementById('userFormSection').style.display = 'block';
+              document.getElementById('companyName').value = user.companyName;
+              loadContactInfo();
+            }
+          } else {
+            redirectToLogin();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('사용자 정보 로드 실패:', error);
+          redirectToLogin();
+        })
+        .getCurrentUserByToken(sessionToken);
+    }
+
+    // 연락처 정보 로드 (일반 사용자용)
+    function loadContactInfo() {
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (!response) {
+            console.error('응답이 null입니다.');
+            return;
+          }
+          if (response.success && response.data && response.data.length > 0) {
+            const contact = response.data[0];
+            // 폼에 데이터 로드
+            document.getElementById('contactName').value = contact.contactName || '';
+            document.getElementById('phone').value = contact.phone || '';
+            document.getElementById('email').value = contact.email || '';
+            // 테이블 표시
+            displayUserContactTable(contact);
+          } else {
+            // 데이터가 없으면 테이블 숨김
+            document.getElementById('userContactTable').style.display = 'none';
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('연락처 정보 로드 실패:', error);
+        })
+        .getContactInfo(sessionToken, null);
+    }
+
+    // 일반 사용자용 테이블 표시
+    function displayUserContactTable(contact) {
+      const tableBody = document.getElementById('userContactTableBody');
+      const tableDiv = document.getElementById('userContactTable');
+
+      if (!contact) {
+        tableDiv.style.display = 'none';
+        return;
+      }
+
+      let html = '<tr>';
+      html += '<td>' + (contact.contactName || '-') + '</td>';
+      html += '<td>' + (contact.phone || '-') + '</td>';
+      html += '<td>' + (contact.email || '-') + '</td>';
+      html += '<td>' + (contact.createdAt ? formatDate(contact.createdAt) : '-') + '</td>';
+      html += '<td>';
+      html += '<button class="btn-sm btn-edit" onclick="editContactInfo()" style="margin-right: 5px;">✏️ 수정</button>';
+      html += '<button class="btn-sm btn-delete" onclick="deleteContactInfo()">🗑️ 삭제</button>';
+      html += '</td>';
+      html += '</tr>';
+
+      tableBody.innerHTML = html;
+      tableDiv.style.display = 'block';
+    }
+
+    // 모든 연락처 정보 로드 (관리자/JEO용)
+    function loadAllContactInfo() {
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (!response) {
+            console.error('응답이 null입니다.');
+            showError('서버로부터 응답을 받지 못했습니다.');
+            return;
+          }
+          if (response.success) {
+            displayContactTable(response.data);
+          } else {
+            showError(response.message || '연락처 정보를 불러올 수 없습니다.');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('연락처 정보 로드 실패:', error);
+          showError('연락처 정보를 불러올 수 없습니다.');
+        })
+        .getAllContactInfo(sessionToken);
+    }
+
+    // 연락처 테이블 표시
+    function displayContactTable(data) {
+      const container = document.getElementById('tableContainer');
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>등록된 연락처 정보가 없습니다.</p></div>';
+        return;
+      }
+
+      let html = '<div class="table-responsive"><table><thead><tr>';
+      html += '<th>업체명</th>';
+      html += '<th>품질담당자</th>';
+      html += '<th>연락처</th>';
+      html += '<th>이메일</th>';
+      html += '<th>등록일</th>';
+      html += '<th>수정일</th>';
+      html += '</tr></thead><tbody>';
+
+      data.forEach(function(contact) {
+        html += '<tr>';
+        html += '<td>' + (contact.companyName || '') + '</td>';
+        html += '<td>' + (contact.contactName || '-') + '</td>';
+        html += '<td>' + (contact.phone || '-') + '</td>';
+        html += '<td>' + (contact.email || '-') + '</td>';
+        html += '<td>' + (contact.createdAt ? formatDate(contact.createdAt) : '-') + '</td>';
+        html += '<td>' + (contact.updatedAt ? formatDate(contact.updatedAt) : '-') + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+      html += '<p style="margin-top: 15px; color: #666; font-size: 14px;">총 ' + data.length + '건</p>';
+
+      container.innerHTML = html;
+    }
+
+    // 날짜 포맷팅
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const date = new Date(dateStr);
+        return date.toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
+    // 에러 표시
+    function showError(message) {
+      const container = document.getElementById('tableContainer');
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>' + message + '</p></div>';
+    }
+
+    // 폼 제출
+    document.addEventListener('DOMContentLoaded', function() {
+      const form = document.getElementById('contactForm');
+      if (form) {
+        form.addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const contactName = document.getElementById('contactName').value.trim();
+          const phone = document.getElementById('phone').value.trim();
+          const email = document.getElementById('email').value.trim();
+
+          if (!contactName || !phone || !email) {
+            alert('모든 필수 항목을 입력해주세요.');
+            return;
+          }
+
+          // 이메일 형식 검증
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(email)) {
+            alert('올바른 이메일 주소를 입력해주세요.');
+            return;
+          }
+
+          // 전화번호 형식 검증 (선택적)
+          const phoneRegex = /^[0-9-+() ]+$/;
+          if (!phoneRegex.test(phone)) {
+            alert('올바른 연락처 형식을 입력해주세요.');
+            return;
+          }
+
+          const contactData = {
+            companyName: currentUser.companyName,
+            contactName: contactName,
+            phone: phone,
+            email: email
+          };
+
+          google.script.run
+            .withSuccessHandler(function(response) {
+              if (response.success) {
+                alert('연락처 정보가 저장되었습니다.');
+                // 저장 후 정보 다시 로드
+                loadContactInfo();
+              } else {
+                alert(response.message || '저장 중 오류가 발생했습니다.');
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.error('저장 실패:', error);
+              alert('저장 중 오류가 발생했습니다.');
+            })
+            .saveContactInfo(sessionToken, contactData);
+        });
+      }
+    });
+
+    // 연락처 정보 수정 (폼으로 스크롤)
+    function editContactInfo() {
+      // 이미 폼에 데이터가 로드되어 있으므로 폼으로 스크롤만
+      document.getElementById('contactForm').scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+      // 첫 번째 입력 필드에 포커스
+      document.getElementById('contactName').focus();
+    }
+
+    // 연락처 정보 삭제
+    function deleteContactInfo() {
+      if (!confirm('연락처 정보를 삭제하시겠습니까?')) {
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response.success) {
+            alert('연락처 정보가 삭제되었습니다.');
+            // 폼 초기화
+            document.getElementById('contactName').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('email').value = '';
+            // 테이블 숨김
+            document.getElementById('userContactTable').style.display = 'none';
+          } else {
+            alert(response.message || '삭제 중 오류가 발생했습니다.');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('삭제 실패:', error);
+          alert('삭제 중 오류가 발생했습니다.');
+        })
+        .deleteContactInfo(sessionToken, currentUser.companyName);
+    }
+
+    // 로그아웃
+    function logout() {
+      if (confirm('로그아웃 하시겠습니까?')) {
+        const token = sessionStorage.getItem('sessionToken');
+        google.script.run
+          .withSuccessHandler(function() {
+            sessionStorage.removeItem('sessionToken');
+            redirectToLogin();
+          })
+          .withFailureHandler(function(error) {
+            console.error('로그아웃 실패:', error);
+            sessionStorage.removeItem('sessionToken');
+            redirectToLogin();
+          })
+          .logoutWithToken(token);
+      }
+    }
+  </script>
+</body>
+</html>
