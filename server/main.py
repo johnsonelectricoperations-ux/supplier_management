@@ -66,11 +66,18 @@ def index():
 def get_config():
     """설정 조회 (Spreadsheet ID, Drive Folder ID, 서비스 계정 여부)"""
     cfg = _load_cfg()
+    sa_email = ""
+    if SA_FILE.exists():
+        try:
+            sa_email = json.loads(SA_FILE.read_text(encoding="utf-8")).get("client_email", "")
+        except Exception:
+            pass
     return {
         "success":       True,
         "sheet_id":      cfg.get("sheet_id", ""),
         "folder_id":     cfg.get("folder_id", ""),
         "sa_configured": SA_FILE.exists(),
+        "sa_email":      sa_email,
     }
 
 

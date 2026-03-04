@@ -386,9 +386,22 @@ async function fetchServerConfig() {
     if (json.folder_id) document.getElementById('cfgFolderId').value = json.folder_id;
     const el = document.getElementById('saStatus');
     if (el) {
-      el.innerHTML = json.sa_configured
-        ? '<span style="color:var(--success);">✅ 서비스 계정 설정됨 (로그인 없이 동기화 가능)</span>'
-        : '<span style="color:var(--danger);">❌ service_account.json 없음 — 서버PC의 server/ 폴더에 파일을 배치하세요.</span>';
+      if (json.sa_configured && json.sa_email) {
+        el.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <span style="color:var(--success);font-weight:600;">✅ 서비스 계정 설정됨</span>
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:13px;">
+              <b>아래 이메일을 Google Sheets와 Drive 폴더에 공유(뷰어)하세요:</b><br>
+              <code style="user-select:all;color:#15803d;font-size:13px;">${json.sa_email}</code>
+              <button class="btn btn-sm btn-outline" style="margin-left:8px;padding:2px 8px;font-size:12px;"
+                onclick="navigator.clipboard.writeText('${json.sa_email}').then(()=>alert('복사됨'))">복사</button>
+            </div>
+          </div>`;
+      } else if (json.sa_configured) {
+        el.innerHTML = '<span style="color:var(--success);">✅ 서비스 계정 설정됨</span>';
+      } else {
+        el.innerHTML = '<span style="color:var(--danger);">❌ service_account.json 없음 — 서버PC의 server/ 폴더에 파일을 배치하세요.</span>';
+      }
     }
   } catch(e) { console.warn('서버 설정 로드 실패', e); }
 }
