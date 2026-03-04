@@ -157,6 +157,22 @@
     }
 
     .hidden { display: none !important; }
+    /* TM-NO 자동완성 드롭다운 */
+    .tm-autocomplete {
+      position: absolute; top: 100%; left: 0;
+      min-width: 240px; max-height: 200px; overflow-y: auto;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.13); z-index: 999;
+      display: none; margin-top: 2px; list-style: none; padding: 4px 0;
+    }
+    .tm-autocomplete.open { display: block; }
+    .tm-autocomplete li {
+      padding: 7px 12px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f1f5f9; white-space: nowrap;
+    }
+    .tm-autocomplete li:last-child { border-bottom: none; }
+    .tm-autocomplete li:hover { background: #f0f4ff; color: var(--primary); }
+    .tm-autocomplete .tm-product { color: var(--muted); font-size: 11px; margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -222,7 +238,10 @@
           </div>
           <div class="form-group">
             <label>TM-NO</label>
-            <input type="text" id="filterTmNo" placeholder="부분 검색" style="width:140px;">
+            <div style="position:relative;">
+              <input type="text" id="filterTmNo" placeholder="업체 선택 후 입력" style="width:160px;" autocomplete="off">
+              <ul id="tmNoDropdown" class="tm-autocomplete"></ul>
+            </div>
           </div>
           <div class="form-group">
             <label>검사형태</label>
@@ -564,6 +583,8 @@ function resetFilter() {
   document.getElementById('filterDateFrom').value = '';
   document.getElementById('filterDateTo').value   = '';
   document.getElementById('filterTmNo').value     = '';
+  _hideTmDropdown();
+  _tmNoItems = [];
   document.getElementById('filterInspType').value = '';
   document.getElementById('historyTbody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:40px;">검색 조건을 입력하고 검색 버튼을 눌러주세요.</td></tr>';
   document.getElementById('pagination').innerHTML = '';
@@ -847,6 +868,22 @@ function parseDataSheet(rows, companyName) {
   })).filter(r => r.id && r.company_name);
 }
 
+/**
+ * List_C01 시트 파싱
+ * 컬럼: A=업체CODE(0), B=TM-NO(1), C=제품명(2), D=업체명(3), E=검사형태(4), F=검사기준서(5)
+ */
+function parseListSheet(rows, companyName) {
+  if (rows.length < 2) return [];
+  return rows.slice(1).map(row => ({
+    company_code:        row[0] || '',
+    tm_no:               row[1] || '',
+    product_name:        row[2] || '',
+    company_name:        row[3] || companyName,
+    inspection_type:     row[4] || '검사',
+    inspection_standard: row[5] || '',
+  })).filter(r => r.tm_no);
+}
+
 // ════════════════════════════════════════
 //  Google Drive PDF 목록 조회
 // ════════════════════════════════════════
@@ -993,6 +1030,20 @@ async function syncSpreadsheet(token, cfg) {
   }
 
   log(`수집: 입고 ${allData.length}건`, 'ok');
+
+  // List_C01, List_C02, ... 시트 파싱 (TM-NO 품목 목록)
+  const listSheets = sheetNames.filter(n => n.startsWith('List_'));
+  log(`List 시트 ${listSheets.length}개 발견`, 'info');
+  let allItems = [];
+  for (const name of listSheets) {
+    const companyCode = name.replace(/^List_/, '');
+    const companyName = companyMap[companyCode] || companyCode;
+    log(`읽는 중: ${name} (${companyName})`, 'info');
+    const rows = await fetchSheetData(token, sheetId, name);
+    allItems.push(...parseListSheet(rows, companyName));
+  }
+  if (allItems.length > 0) log(`수집: 품목 ${allItems.length}건`, 'ok');
+
   setProgress(55, '서버PC로 전송 중...');
 
   // 서버PC로 전송 (사내망)
@@ -1002,7 +1053,7 @@ async function syncSpreadsheet(token, cfg) {
     body:    JSON.stringify({
       incoming_data:       allData,
       inspection_results:  [],
-      item_list:           [],
+      item_list:           allItems,
     }),
   });
   const json = await res.json();
@@ -1145,18 +1196,85 @@ function escHtml(str) {
 }
 
 // ════════════════════════════════════════
+//  TM-NO 자동완성
+// ════════════════════════════════════════
+let _tmNoItems = [];
+
+async function _loadTmNoItems(company) {
+  try {
+    const res  = await fetch('/api/item-list?company_name=' + encodeURIComponent(company));
+    const json = await res.json();
+    _tmNoItems = json.data || [];
+  } catch(e) { _tmNoItems = []; }
+}
+
+function _showTmDropdown(items) {
+  const ul = document.getElementById('tmNoDropdown');
+  const limited = items.slice(0, 30);
+  if (limited.length === 0) { _hideTmDropdown(); return; }
+  ul.innerHTML = limited.map(i =>
+    `<li data-tm="${escHtml(i.tm_no)}" onmousedown="_pickTmNo(this)">` +
+    `${escHtml(i.tm_no)}<span class="tm-product">${escHtml(i.product_name)}</span></li>`
+  ).join('');
+  ul.classList.add('open');
+}
+
+function _hideTmDropdown() {
+  document.getElementById('tmNoDropdown').classList.remove('open');
+}
+
+function _pickTmNo(el) {
+  document.getElementById('filterTmNo').value = el.dataset.tm;
+  _hideTmDropdown();
+}
+
+// ════════════════════════════════════════
 //  초기화
 // ════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
   fetchServerConfig();
   loadSyncStatus();
   loadCompanies();
-  // 기본 날짜 범위: 최근 3개월
-  const today = new Date();
-  const from  = new Date(today);
-  from.setMonth(from.getMonth() - 3);
-  document.getElementById('filterDateTo').value   = today.toISOString().slice(0,10);
-  document.getElementById('filterDateFrom').value = from.toISOString().slice(0,10);
+
+  // 기본 날짜: 시작일=오늘, 종료일=오늘
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('filterDateFrom').value = today;
+  document.getElementById('filterDateTo').value   = today;
+
+  // 업체 변경 시 TM-NO 초기화 + 품목 목록 미리 로드
+  document.getElementById('filterCompany').addEventListener('change', function() {
+    document.getElementById('filterTmNo').value = '';
+    _hideTmDropdown();
+    _tmNoItems = [];
+    if (this.value) _loadTmNoItems(this.value);
+  });
+
+  // TM-NO 입력 시 드롭다운 표시
+  document.getElementById('filterTmNo').addEventListener('input', function() {
+    if (!document.getElementById('filterCompany').value) return;
+    const val = this.value.trim();
+    const filtered = val
+      ? _tmNoItems.filter(i => i.tm_no.includes(val) || i.product_name.includes(val))
+      : _tmNoItems;
+    _showTmDropdown(filtered);
+  });
+
+  // TM-NO 포커스 시 전체 목록 표시
+  document.getElementById('filterTmNo').addEventListener('focus', function() {
+    if (!document.getElementById('filterCompany').value) return;
+    const val = this.value.trim();
+    const filtered = val
+      ? _tmNoItems.filter(i => i.tm_no.includes(val) || i.product_name.includes(val))
+      : _tmNoItems;
+    _showTmDropdown(filtered);
+  });
+
+  // 외부 클릭 시 드롭다운 닫기
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#filterTmNo') && !e.target.closest('#tmNoDropdown')) {
+      _hideTmDropdown();
+    }
+  });
 });
 </script>
 </body>

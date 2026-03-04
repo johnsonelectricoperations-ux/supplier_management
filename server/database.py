@@ -68,13 +68,14 @@ def init_db():
     );
 
     CREATE TABLE IF NOT EXISTS item_list (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_code    TEXT DEFAULT '',
-        tm_no           TEXT NOT NULL,
-        company_name    TEXT NOT NULL,
-        product_name    TEXT DEFAULT '',
-        inspection_type TEXT DEFAULT '검사',
-        synced_at       TEXT DEFAULT ''
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_code         TEXT DEFAULT '',
+        tm_no                TEXT NOT NULL,
+        company_name         TEXT NOT NULL,
+        product_name         TEXT DEFAULT '',
+        inspection_type      TEXT DEFAULT '검사',
+        inspection_standard  TEXT DEFAULT '',
+        synced_at            TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS sync_log (
@@ -96,6 +97,14 @@ def init_db():
     """)
 
     conn.commit()
+
+    # 마이그레이션: 기존 DB에 inspection_standard 컬럼 추가 (없을 때만)
+    try:
+        c.execute("ALTER TABLE item_list ADD COLUMN inspection_standard TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass  # 이미 존재하면 무시
+
     conn.close()
 
 
@@ -207,11 +216,13 @@ def upsert_item_list(rows: List[Dict]) -> int:
     for row in rows:
         c.execute("""
             INSERT INTO item_list
-                (company_code, tm_no, company_name, product_name, inspection_type, synced_at)
-            VALUES (?,?,?,?,?,?)
+                (company_code, tm_no, company_name, product_name,
+                 inspection_type, inspection_standard, synced_at)
+            VALUES (?,?,?,?,?,?,?)
         """, (
             row.get("company_code",""), row["tm_no"], row["company_name"],
-            row.get("product_name",""), row.get("inspection_type","검사"), synced_at
+            row.get("product_name",""), row.get("inspection_type","검사"),
+            row.get("inspection_standard",""), synced_at
         ))
         count += 1
     conn.commit()
@@ -359,6 +370,23 @@ def get_inspection_results_by_key(date: str, company_name: str, tm_no: str) -> L
         ]
         results.append(r)
     return results
+
+
+def get_item_list(company_name: str = "", tm_no: str = "") -> List[Dict]:
+    """TM-NO 자동완성용 품목 목록 조회"""
+    conn = get_conn()
+    sql = "SELECT company_code, tm_no, company_name, product_name, inspection_type, inspection_standard FROM item_list WHERE 1=1"
+    params = []
+    if company_name:
+        sql += " AND company_name = ?"
+        params.append(company_name)
+    if tm_no:
+        sql += " AND tm_no LIKE ?"
+        params.append(f"%{tm_no}%")
+    sql += " ORDER BY tm_no ASC"
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def get_companies() -> List[str]:

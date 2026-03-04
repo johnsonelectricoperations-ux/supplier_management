@@ -44,6 +44,7 @@ class ItemListRow(BaseModel):
     company_name: str
     product_name: str = ""
     inspection_type: str = "검사"
+    inspection_standard: str = ""
 
 
 class SyncBatchRequest(BaseModel):

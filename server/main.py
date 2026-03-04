@@ -283,6 +283,19 @@ def get_companies():
     return {"success": True, "data": db.get_companies()}
 
 
+@app.get("/api/item-list")
+def get_item_list(
+    company_name: Optional[str] = Query(None),
+    tm_no:        Optional[str] = Query(None),
+):
+    """품목 목록 조회 (TM-NO 자동완성용)"""
+    data = db.get_item_list(
+        company_name=company_name or "",
+        tm_no=tm_no or "",
+    )
+    return {"success": True, "data": data}
+
+
 # ─── PDF 서빙 ─────────────────────────────────────────
 
 @app.get("/api/pdf/{file_path:path}")
