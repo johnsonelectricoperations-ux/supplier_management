@@ -3,6 +3,7 @@ main.py - FastAPI 서버 (서버PC용)
 접속: http://10.80.101.200:5002
 """
 import os
+import json
 import base64
 import mimetypes
 from pathlib import Path
@@ -15,12 +16,24 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import database as db
-from models import SyncBatchRequest, PdfSyncRequest
+from models import SyncBatchRequest, PdfSyncRequest, AppConfigRequest
 
 # ─── 경로 설정 ────────────────────────────────────────
-BASE_DIR = Path(__file__).parent
-PDF_DIR  = BASE_DIR / "pdfs"
+BASE_DIR   = Path(__file__).parent
+PDF_DIR    = BASE_DIR / "pdfs"
 STATIC_DIR = BASE_DIR / "static"
+CONFIG_FILE = BASE_DIR / "config.json"
+SA_FILE     = BASE_DIR / "service_account.json"
+
+
+def _load_cfg() -> dict:
+    if CONFIG_FILE.exists():
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    return {}
+
+
+def _save_cfg(data: dict):
+    CONFIG_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 PDF_DIR.mkdir(exist_ok=True)
 STATIC_DIR.mkdir(exist_ok=True)
@@ -45,6 +58,50 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 @app.get("/", response_class=FileResponse)
 def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+
+# ─── 설정 API ─────────────────────────────────────────
+
+@app.get("/api/config")
+def get_config():
+    """설정 조회 (Spreadsheet ID, Drive Folder ID, 서비스 계정 여부)"""
+    cfg = _load_cfg()
+    return {
+        "success":       True,
+        "sheet_id":      cfg.get("sheet_id", ""),
+        "folder_id":     cfg.get("folder_id", ""),
+        "sa_configured": SA_FILE.exists(),
+    }
+
+
+@app.post("/api/config")
+def save_config(req: AppConfigRequest):
+    """설정 저장"""
+    cfg = _load_cfg()
+    cfg["sheet_id"]  = req.sheet_id
+    cfg["folder_id"] = req.folder_id
+    _save_cfg(cfg)
+    return {"success": True, "message": "설정이 서버에 저장되었습니다."}
+
+
+@app.get("/api/service-account")
+def get_service_account():
+    """서비스 계정 키 정보 반환 (사내망 전용)"""
+    if not SA_FILE.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="service_account.json 파일이 없습니다. 서버PC의 server/ 폴더에 파일을 배치해 주세요."
+        )
+    try:
+        sa = json.loads(SA_FILE.read_text(encoding="utf-8"))
+        return {
+            "success":      True,
+            "client_email": sa["client_email"],
+            "private_key":  sa["private_key"],
+            "token_uri":    sa.get("token_uri", "https://oauth2.googleapis.com/token"),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서비스 계정 파일 읽기 실패: {e}")
 
 
 # ─── 동기화 API ───────────────────────────────────────

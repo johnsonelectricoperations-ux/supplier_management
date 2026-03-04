@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>검사성적서 관리 시스템</title>
-  <!-- Google Identity Services (OAuth 2.0) -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -273,15 +271,13 @@
     <div id="page-sync" class="hidden">
       <div class="card">
         <div class="card-title">⚙️ Google 연동 설정</div>
-        <div class="config-note">
-          ⚠️ 아래 설정은 브라우저에 저장됩니다. 최초 1회 입력 후 동기화 버튼을 누르세요.
+        <div class="config-note" style="background:#e0f2fe;border-color:#38bdf8;color:#075985;">
+          ✅ 설정은 <b>서버PC에 저장</b>됩니다. 최초 1회 입력하면 어떤 PC에서 접속해도 자동으로 불러옵니다.
+        </div>
+        <div style="margin-bottom:14px;" id="saStatus">
+          <span style="color:var(--muted);">서비스 계정 상태 확인 중...</span>
         </div>
         <div class="sync-config">
-          <div class="form-group">
-            <label>Google OAuth Client ID</label>
-            <input type="text" id="cfgClientId" placeholder="xxxxx.apps.googleusercontent.com" style="width:100%;">
-            <span style="font-size:11px;color:var(--muted);">Google Cloud Console → OAuth 2.0 클라이언트 ID</span>
-          </div>
           <div class="form-group">
             <label>Spreadsheet ID</label>
             <input type="text" id="cfgSheetId" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" style="width:100%;">
@@ -292,12 +288,8 @@
             <input type="text" id="cfgFolderId" placeholder="Google Drive 폴더 ID" style="width:100%;">
             <span style="font-size:11px;color:var(--muted);">Drive에서 폴더 열기 → URL의 마지막 ID 값</span>
           </div>
-          <div class="form-group">
-            <label>서버 PC 주소</label>
-            <input type="text" id="cfgServerUrl" value="http://10.80.101.200:5002" style="width:100%;">
-          </div>
         </div>
-        <button class="btn btn-primary" onclick="saveConfig()">설정 저장</button>
+        <button class="btn btn-primary" onclick="saveConfig()">설정 저장 (서버에 저장)</button>
       </div>
 
       <div class="card">
@@ -343,10 +335,10 @@
       <div class="card">
         <div class="card-title">ℹ️ 사용 방법</div>
         <ol style="padding-left:20px;line-height:2;font-size:14px;color:var(--muted);">
-          <li><b>설정 탭</b>에서 Google OAuth Client ID, Spreadsheet ID, Drive 폴더 ID를 입력하고 저장</li>
-          <li><b>동기화 탭</b>에서 <b>전체 동기화 시작</b> 버튼 클릭</li>
-          <li>Google 로그인 팝업이 열리면 권한 허용</li>
-          <li>브라우저가 Google Sheets/Drive 데이터를 서버PC로 전송 (자동)</li>
+          <li><b>[관리자 최초 1회]</b> 서버PC의 <code>server/</code> 폴더에 <code>service_account.json</code> 파일 배치</li>
+          <li><b>[관리자 최초 1회]</b> 설정 탭에서 Spreadsheet ID, Drive 폴더 ID 입력 후 서버에 저장</li>
+          <li>이후 어떤 PC에서든 브라우저로 접속 후 <b>전체 동기화 시작</b> 버튼 클릭</li>
+          <li>Google 로그인 없이 자동으로 데이터 동기화</li>
           <li><b>이력 조회 탭</b>에서 검색 및 PDF 열람</li>
         </ol>
       </div>
@@ -379,37 +371,42 @@
 
 <script>
 // ════════════════════════════════════════
-//  설정
+//  설정 (서버에서 로드/저장)
 // ════════════════════════════════════════
-const CFG_KEY = 'inspection_cfg';
+let _serverConfig = { sheet_id: '', folder_id: '', sa_configured: false };
 
-function loadConfig() {
-  try { return JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch { return {}; }
+async function fetchServerConfig() {
+  try {
+    const res  = await fetch('/api/config');
+    const json = await res.json();
+    _serverConfig = json;
+    if (json.sheet_id)  document.getElementById('cfgSheetId').value  = json.sheet_id;
+    if (json.folder_id) document.getElementById('cfgFolderId').value = json.folder_id;
+    const el = document.getElementById('saStatus');
+    if (el) {
+      el.innerHTML = json.sa_configured
+        ? '<span style="color:var(--success);">✅ 서비스 계정 설정됨 (로그인 없이 동기화 가능)</span>'
+        : '<span style="color:var(--danger);">❌ service_account.json 없음 — 서버PC의 server/ 폴더에 파일을 배치하세요.</span>';
+    }
+  } catch(e) { console.warn('서버 설정 로드 실패', e); }
 }
 
-function saveConfig() {
-  const cfg = {
-    clientId:  document.getElementById('cfgClientId').value.trim(),
-    sheetId:   document.getElementById('cfgSheetId').value.trim(),
-    folderId:  document.getElementById('cfgFolderId').value.trim(),
-    serverUrl: document.getElementById('cfgServerUrl').value.trim().replace(/\/$/, ''),
-  };
-  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-  log('설정이 저장되었습니다.', 'ok');
-  alert('설정이 저장되었습니다.');
-}
-
-function applyConfigToForm() {
-  const cfg = loadConfig();
-  if (cfg.clientId)  document.getElementById('cfgClientId').value  = cfg.clientId;
-  if (cfg.sheetId)   document.getElementById('cfgSheetId').value   = cfg.sheetId;
-  if (cfg.folderId)  document.getElementById('cfgFolderId').value  = cfg.folderId;
-  if (cfg.serverUrl) document.getElementById('cfgServerUrl').value = cfg.serverUrl;
-}
-
-function getServerUrl() {
-  const cfg = loadConfig();
-  return cfg.serverUrl || 'http://10.80.101.200:5002';
+async function saveConfig() {
+  const sheet_id  = document.getElementById('cfgSheetId').value.trim();
+  const folder_id = document.getElementById('cfgFolderId').value.trim();
+  try {
+    const res  = await fetch('/api/config', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ sheet_id, folder_id }),
+    });
+    const json = await res.json();
+    if (json.success) {
+      _serverConfig = { ..._serverConfig, sheet_id, folder_id };
+      log('설정이 서버에 저장되었습니다.', 'ok');
+      alert('설정이 서버에 저장되었습니다.');
+    }
+  } catch(e) { alert('설정 저장 실패: ' + e.message); }
 }
 
 // ════════════════════════════════════════
@@ -421,7 +418,7 @@ function showPage(name) {
     document.getElementById('nav-' + p).classList.toggle('active', p === name);
   });
   if (name === 'history') loadCompanies();
-  if (name === 'sync')    { applyConfigToForm(); loadSyncStatus(); }
+  if (name === 'sync')    { fetchServerConfig(); loadSyncStatus(); }
   if (name === 'settings') loadSystemInfo();
 }
 
@@ -432,7 +429,7 @@ let currentPage = 1;
 
 async function loadCompanies() {
   try {
-    const res = await fetch(getServerUrl() + '/api/companies');
+    const res = await fetch('/api/companies');
     const json = await res.json();
     const sel = document.getElementById('filterCompany');
     const cur = sel.value;
@@ -459,7 +456,7 @@ async function searchHistory(page) {
   });
 
   try {
-    const res  = await fetch(getServerUrl() + '/api/history?' + params);
+    const res  = await fetch('/api/history?' + params);
     const json = await res.json();
     renderHistory(json);
   } catch(e) {
@@ -566,7 +563,7 @@ async function openDetail(date, companyName, tmNo, productName) {
 
   try {
     const params = new URLSearchParams({ date, company_name: companyName, tm_no: tmNo });
-    const res  = await fetch(getServerUrl() + '/api/history/results?' + params);
+    const res  = await fetch('/api/history/results?' + params);
     const json = await res.json();
     renderDetailModal(json.data || [], productName, date);
   } catch(e) {
@@ -625,7 +622,7 @@ function closeModal() { document.getElementById('detailModal').classList.remove(
 // ════════════════════════════════════════
 function openPdf(localPath, tmNo) {
   document.getElementById('pdfTitle').textContent = `성적서 PDF - ${tmNo}`;
-  document.getElementById('pdfFrame').src = getServerUrl() + '/api/pdf/' + localPath;
+  document.getElementById('pdfFrame').src = '/api/pdf/' + localPath;
   document.getElementById('pdfModal').classList.add('open');
 }
 function closePdfModal() {
@@ -638,7 +635,7 @@ function closePdfModal() {
 // ════════════════════════════════════════
 async function loadSyncStatus() {
   try {
-    const res  = await fetch(getServerUrl() + '/api/sync/status');
+    const res  = await fetch('/api/sync/status');
     const json = await res.json();
     const last = json.last_sync;
     const badge = document.getElementById('syncStatusBadge');
@@ -679,10 +676,9 @@ function renderSyncHistory(items) {
 //  시스템 정보
 // ════════════════════════════════════════
 async function loadSystemInfo() {
-  const cfg = loadConfig();
-  document.getElementById('infoServer').textContent = cfg.serverUrl || 'http://10.80.101.200:5002';
+  document.getElementById('infoServer').textContent = window.location.host;
   try {
-    const res = await fetch(getServerUrl() + '/api/sync/status');
+    const res = await fetch('/api/sync/status');
     const json = await res.json();
     const last = json.last_sync;
     document.getElementById('infoLastSync').textContent = last ? last.synced_at : '없음';
@@ -711,35 +707,79 @@ function setProgress(pct, label) {
 }
 
 // ════════════════════════════════════════
-//  Google OAuth (GIS Token Model)
+//  서비스 계정 토큰 (JWT → Access Token)
 // ════════════════════════════════════════
-let _accessToken = null;
+let _cachedToken = null;
+let _tokenExpiry = 0;
 
-function getAccessToken() {
-  return new Promise((resolve, reject) => {
-    const cfg = loadConfig();
-    if (!cfg.clientId) {
-      reject(new Error('OAuth Client ID가 설정되지 않았습니다. 설정 탭을 확인하세요.'));
-      return;
-    }
+async function getAccessToken() {
+  // 캐시된 토큰이 유효하면 재사용 (만료 5분 전까지)
+  if (_cachedToken && Date.now() < _tokenExpiry - 300000) {
+    return _cachedToken;
+  }
 
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: cfg.clientId,
-      scope: [
-        'https://www.googleapis.com/auth/spreadsheets.readonly',
-        'https://www.googleapis.com/auth/drive.readonly',
-      ].join(' '),
-      callback: (resp) => {
-        if (resp.error) {
-          reject(new Error('Google 인증 실패: ' + resp.error));
-        } else {
-          _accessToken = resp.access_token;
-          resolve(resp.access_token);
-        }
-      },
-    });
-    client.requestAccessToken();
+  log('서비스 계정 정보 로드 중...', 'info');
+  const res = await fetch('/api/service-account');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || '서비스 계정 정보를 가져올 수 없습니다. 서버PC에 service_account.json 파일을 배치해 주세요.');
+  }
+  const sa = await res.json();
+
+  // JWT 생성
+  const now   = Math.floor(Date.now() / 1000);
+  const b64url = obj => btoa(JSON.stringify(obj))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const header  = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss:   sa.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly',
+    aud:   sa.token_uri,
+    exp:   now + 3600,
+    iat:   now,
+  };
+
+  const signingInput = b64url(header) + '.' + b64url(payload);
+
+  // PEM → ArrayBuffer
+  const pemKey   = sa.private_key
+    .replace(/-----BEGIN PRIVATE KEY-----\n?/, '')
+    .replace(/\n?-----END PRIVATE KEY-----\n?/, '')
+    .replace(/\n/g, '');
+  const keyBytes = Uint8Array.from(atob(pemKey), c => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', keyBytes.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign']
+  );
+
+  const sigBytes = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5', cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  const sig = btoa(String.fromCharCode(...new Uint8Array(sigBytes)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const jwt = signingInput + '.' + sig;
+
+  // Google에서 액세스 토큰 발급
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:    'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,
   });
+  const tokenJson = await tokenRes.json();
+  if (!tokenJson.access_token) {
+    throw new Error('액세스 토큰 발급 실패: ' + JSON.stringify(tokenJson));
+  }
+
+  _cachedToken = tokenJson.access_token;
+  _tokenExpiry = Date.now() + (tokenJson.expires_in || 3600) * 1000;
+  log('서비스 계정 인증 성공 (1시간 유효)', 'ok');
+  return _cachedToken;
 }
 
 // ════════════════════════════════════════
@@ -893,9 +933,9 @@ async function syncPdfOnly() {
 
 async function runSync(doData, doPdf) {
   if (syncRunning) { alert('이미 동기화가 진행 중입니다.'); return; }
-  const cfg = loadConfig();
-  if (!cfg.clientId || !cfg.sheetId) {
-    alert('설정 탭에서 OAuth Client ID와 Spreadsheet ID를 먼저 입력하세요.');
+  const cfg = { sheetId: _serverConfig.sheet_id, folderId: _serverConfig.folder_id };
+  if (!cfg.sheetId) {
+    alert('설정 탭에서 Spreadsheet ID를 먼저 입력하세요.');
     showPage('sync');
     return;
   }
@@ -906,11 +946,9 @@ async function runSync(doData, doPdf) {
   document.getElementById('logBox').innerHTML = '';
 
   try {
-    // 1. Google 인증
-    log('Google 인증 중...', 'info');
-    setProgress(5, 'Google 로그인 중...');
+    // 1. 서비스 계정 인증
+    setProgress(5, '서비스 계정 인증 중...');
     const token = await getAccessToken();
-    log('인증 성공', 'ok');
 
     if (doData) await syncSpreadsheet(token, cfg);
     if (doPdf && cfg.folderId) await syncDrivePdfs(token, cfg);
@@ -932,7 +970,7 @@ async function syncSpreadsheet(token, cfg) {
   log('스프레드시트 시트 목록 조회 중...', 'info');
   setProgress(10, '시트 목록 조회 중...');
 
-  const sheetNames = await fetchSheetNames(token, cfg.sheetId);
+  const sheetNames = await fetchSheetNames(token, cfg.sheetId || cfg.sheet_id);
   log(`총 ${sheetNames.length}개 시트 발견`, 'info');
 
   const dataSheets   = sheetNames.filter(n => n.endsWith('_Data'));
@@ -949,7 +987,7 @@ async function syncSpreadsheet(token, cfg) {
   for (const name of dataSheets) {
     const companyName = name.replace(/_Data$/, '');
     log(`읽는 중: ${name}`, 'info');
-    const rows = await fetchSheetData(token, cfg.sheetId, name);
+    const rows = await fetchSheetData(token, cfg.sheetId || cfg.sheet_id, name);
     allData.push(...parseDataSheet(rows, companyName));
     done++;
     setProgress(10 + (done / total * 40), `${name} 읽기 완료`);
@@ -959,7 +997,7 @@ async function syncSpreadsheet(token, cfg) {
   for (const name of resultSheets) {
     const companyName = name.replace(/_Result$/, '');
     log(`읽는 중: ${name}`, 'info');
-    const rows = await fetchSheetData(token, cfg.sheetId, name);
+    const rows = await fetchSheetData(token, cfg.sheetId || cfg.sheet_id, name);
     allResults.push(...parseResultSheet(rows, companyName));
     done++;
     setProgress(10 + (done / total * 40), `${name} 읽기 완료`);
@@ -969,7 +1007,7 @@ async function syncSpreadsheet(token, cfg) {
   for (const name of itemSheets) {
     const companyName = name.replace(/_ItemList$/, '');
     log(`읽는 중: ${name}`, 'info');
-    const rows = await fetchSheetData(token, cfg.sheetId, name);
+    const rows = await fetchSheetData(token, cfg.sheetId || cfg.sheet_id, name);
     allItems.push(...parseItemSheet(rows, companyName));
     done++;
     setProgress(10 + (done / total * 40), `${name} 읽기 완료`);
@@ -979,7 +1017,7 @@ async function syncSpreadsheet(token, cfg) {
   setProgress(55, '서버PC로 전송 중...');
 
   // 서버PC로 전송 (사내망)
-  const res = await fetch(getServerUrl() + '/api/sync/batch', {
+  const res = await fetch('/api/sync/batch', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify({
@@ -999,7 +1037,7 @@ async function syncDrivePdfs(token, cfg) {
   log('Drive 폴더 조회 중: 검사성적서/[업체]/[년도]/[월]', 'info');
 
   // 업체 폴더 목록
-  const companies = await listSubFolders(token, cfg.folderId);
+  const companies = await listSubFolders(token, cfg.folderId || cfg.folder_id);
   log(`업체 폴더: ${companies.map(c=>c.name).join(', ')}`, 'info');
 
   let totalPdf = 0, savedPdf = 0;
@@ -1029,7 +1067,7 @@ async function syncDrivePdfs(token, cfg) {
             const tmNoMatch = file.name.match(/_([A-Z0-9\-]+)_/);
             const tmNo = tmNoMatch ? tmNoMatch[1] : '';
 
-            const res = await fetch(getServerUrl() + '/api/sync/pdf', {
+            const res = await fetch('/api/sync/pdf', {
               method:  'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1072,7 +1110,7 @@ function escHtml(str) {
 //  초기화
 // ════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
-  applyConfigToForm();
+  fetchServerConfig();
   loadSyncStatus();
   loadCompanies();
   // 기본 날짜 범위: 최근 3개월

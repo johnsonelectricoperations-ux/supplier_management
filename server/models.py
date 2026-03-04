@@ -62,6 +62,11 @@ class PdfSyncRequest(BaseModel):
     tm_no: str = ""
 
 
+class AppConfigRequest(BaseModel):
+    sheet_id:  str = ""
+    folder_id: str = ""
+
+
 class HistoryFilter(BaseModel):
     company_name: Optional[str] = None
     date_from: Optional[str] = None
