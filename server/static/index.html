@@ -866,9 +866,10 @@ async function listSubFolders(token, parentFolderId) {
 /**
  * 폴더 내 PDF 파일 목록
  */
-async function listPdfFiles(token, folderId) {
-  const q = encodeURIComponent(`'${folderId}' in parents and mimeType='application/pdf' and trashed=false`);
-  const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,size)&pageSize=200`;
+async function listPdfFiles(token, folderId, modifiedAfter = null) {
+  let q = `'${folderId}' in parents and mimeType='application/pdf' and trashed=false`;
+  if (modifiedAfter) q += ` and modifiedTime > '${modifiedAfter}'`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,size)&pageSize=200`;
   const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
   if (!res.ok) return [];
   const json = await res.json();
@@ -930,8 +931,20 @@ async function runSync(doData, doPdf) {
     const token = await getAccessToken();
 
     if (doData) await syncSpreadsheet(token, cfg);
-    if (doPdf && cfg.folderId) await syncDrivePdfs(token, cfg);
-    else if (doPdf && !cfg.folderId) log('Drive 폴더 ID가 설정되지 않아 PDF 동기화 건너뜀', 'warn');
+    if (doPdf && cfg.folderId) {
+      // 마지막 동기화 시각 조회 (증분 동기화용)
+      let lastSyncTime = null;
+      try {
+        const statusRes  = await fetch('/api/sync/status');
+        const statusJson = await statusRes.json();
+        if (statusJson.last_sync?.synced_at) {
+          // "YYYY-MM-DD HH:mm:ss" → UTC ISO8601 (1시간 버퍼 적용)
+          const d = new Date(statusJson.last_sync.synced_at.replace(' ', 'T'));
+          lastSyncTime = new Date(d.getTime() - 3600000).toISOString();
+        }
+      } catch(e) { /* 조회 실패 시 전체 동기화 */ }
+      await syncDrivePdfs(token, cfg, lastSyncTime);
+    } else if (doPdf && !cfg.folderId) log('Drive 폴더 ID가 설정되지 않아 PDF 동기화 건너뜀', 'warn');
 
     setProgress(100, '동기화 완료!');
     log('✅ 모든 동기화 완료', 'ok');
@@ -998,9 +1011,23 @@ async function syncSpreadsheet(token, cfg) {
   setProgress(60, '스프레드시트 동기화 완료');
 }
 
-async function syncDrivePdfs(token, cfg) {
+async function syncDrivePdfs(token, cfg, lastSyncTime = null) {
   setProgress(62, 'Drive PDF 목록 조회 중...');
   log('Drive 폴더 조회 중: 검사성적서/[업체]/[년도]/[월]', 'info');
+
+  // 현재 년/월 계산 (현재 월 + 전월까지만 탐색)
+  const now        = new Date();
+  const curYear    = now.getFullYear();
+  const curMonth   = now.getMonth() + 1;
+  const prevMonth  = curMonth === 1 ? 12 : curMonth - 1;
+  const prevMonthYear = curMonth === 1 ? curYear - 1 : curYear;
+  const targetYears  = new Set([String(curYear), String(prevMonthYear)]);
+  const targetMonths = new Set([curMonth, prevMonth]);
+
+  if (lastSyncTime) {
+    log(`증분 동기화: ${lastSyncTime} 이후 변경된 파일만 처리`, 'info');
+  }
+  log(`탐색 범위: ${[...targetYears].join('/')}년도, ${[...targetMonths].map(m => String(m).padStart(2,'0')).join('/')}월`, 'info');
 
   // 서버에 이미 저장된 파일명 목록 가져오기 (중복 다운로드 방지)
   let existingFiles = new Set();
@@ -1020,14 +1047,17 @@ async function syncDrivePdfs(token, cfg) {
   let totalPdf = 0, savedPdf = 0, skippedPdf = 0;
 
   for (const company of companies) {
-    // 년도 폴더
+    // 년도 폴더 (현재 년도 + 전월이 1월이면 전년도 포함)
     const years = await listSubFolders(token, company.id);
-    for (const year of years) {
-      // 월 폴더
+    const filteredYears = years.filter(y => targetYears.has(y.name));
+    if (filteredYears.length === 0) continue;
+    for (const year of filteredYears) {
+      // 월 폴더 (현재 월 + 전월만)
       const months = await listSubFolders(token, year.id);
-      for (const month of months) {
-        // PDF 파일 목록
-        const files = await listPdfFiles(token, month.id);
+      const filteredMonths = months.filter(m => targetMonths.has(parseInt(m.name, 10)));
+      for (const month of filteredMonths) {
+        // PDF 파일 목록 (증분: lastSyncTime 이후 변경분만)
+        const files = await listPdfFiles(token, month.id, lastSyncTime);
         totalPdf += files.length;
         log(`${company.name}/${year.name}/${month.name}: ${files.length}개 PDF`, 'info');
 
