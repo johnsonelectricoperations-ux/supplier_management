@@ -776,7 +776,18 @@ async function getAccessToken() {
 async function fetchSheetNames(token, spreadsheetId) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
   const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-  if (!res.ok) throw new Error('스프레드시트 읽기 실패: ' + res.status);
+  if (!res.ok) {
+    if (res.status === 403 || res.status === 404) {
+      // 서비스 계정 이메일을 가져와 안내 메시지 포함
+      let email = '';
+      try { email = (await (await fetch('/api/config')).json()).sa_email || ''; } catch (_) {}
+      const guide = email
+        ? `\n\n👉 Google Sheets에서 아래 이메일을 공유(뷰어)하세요:\n${email}`
+        : '\n\n👉 동기화 설정 탭에서 서비스 계정 이메일을 확인 후 Google Sheets에 공유(뷰어)하세요.';
+      throw new Error(`스프레드시트 읽기 실패 (${res.status})${guide}`);
+    }
+    throw new Error('스프레드시트 읽기 실패: ' + res.status);
+  }
   const json = await res.json();
   return (json.sheets || []).map(s => s.properties.title);
 }
