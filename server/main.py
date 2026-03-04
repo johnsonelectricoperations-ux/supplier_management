@@ -145,8 +145,10 @@ def sync_batch(req: SyncBatchRequest):
         rc = db.upsert_inspection_results(result_rows)
         ic = db.upsert_item_list(item_rows)
 
-        db.add_sync_log(dc, rc, ic, 0, "success",
-                        f"데이터:{dc}건, 결과:{rc}건, 품목:{ic}건 동기화 완료")
+        if req.write_log:
+            log_dc = req.total_hint if req.total_hint > 0 else dc
+            db.add_sync_log(log_dc, rc, ic, 0, "success",
+                            f"데이터:{log_dc}건, 결과:{rc}건, 품목:{ic}건 동기화 완료")
 
         return {
             "success": True,

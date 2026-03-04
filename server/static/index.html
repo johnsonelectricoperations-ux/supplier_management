@@ -1046,19 +1046,39 @@ async function syncSpreadsheet(token, cfg) {
 
   setProgress(55, '서버PC로 전송 중...');
 
-  // 서버PC로 전송 (사내망)
-  const res = await fetch('/api/sync/batch', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({
-      incoming_data:       allData,
-      inspection_results:  [],
-      item_list:           allItems,
-    }),
-  });
-  const json = await res.json();
-  if (!json.success) throw new Error(json.detail || '서버 저장 실패');
-  log(`서버 저장 완료: ${json.message}`, 'ok');
+  // 서버PC로 배치 전송 (500건씩 분할 — 대용량 데이터 안정 처리)
+  const BATCH_SIZE = 500;
+  const totalData  = allData.length;
+  let   sentCount  = 0;
+
+  for (let i = 0; i < Math.max(totalData, 1); i += BATCH_SIZE) {
+    const batch  = allData.slice(i, i + BATCH_SIZE);
+    const isLast = (i + BATCH_SIZE) >= totalData;
+    const isFirst = i === 0;
+
+    const res = await fetch('/api/sync/batch', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        incoming_data:      batch,
+        inspection_results: [],
+        item_list:          isFirst ? allItems : [],  // 첫 배치에만 품목 포함
+        write_log:          isLast,                   // 마지막 배치에서만 로그 기록
+        total_hint:         isLast ? totalData : 0,   // 전체 건수를 로그에 반영
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.detail || `서버 저장 실패 (배치 ${Math.floor(i/BATCH_SIZE)+1})`);
+
+    sentCount += batch.length;
+    setProgress(55 + (sentCount / Math.max(totalData, 1) * 5),
+      `서버 전송 중... (${sentCount}/${totalData}건)`);
+
+    // 빈 데이터일 경우 루프 1회로 종료
+    if (totalData === 0) break;
+  }
+
+  log(`서버 저장 완료: 입고 ${totalData}건, 품목 ${allItems.length}건`, 'ok');
   setProgress(60, '스프레드시트 동기화 완료');
 }
 

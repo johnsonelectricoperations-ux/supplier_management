@@ -51,6 +51,8 @@ class SyncBatchRequest(BaseModel):
     incoming_data: List[IncomingDataRow] = []
     inspection_results: List[InspectionResultRow] = []
     item_list: List[ItemListRow] = []
+    write_log: bool = True      # False이면 sync_log 미기록 (배치 중간 단계)
+    total_hint: int = 0         # 0이 아니면 sync_log에 실제 총 건수로 기록
 
 
 class PdfSyncRequest(BaseModel):
