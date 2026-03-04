@@ -869,7 +869,7 @@ function parseDataSheet(rows, companyName) {
 }
 
 /**
- * List_C01 시트 파싱
+ * List_* 시트 파싱 (List_C01, List_C02, ... 모두 동일 구조)
  * 컬럼: A=업체CODE(0), B=TM-NO(1), C=제품명(2), D=업체명(3), E=검사형태(4), F=검사기준서(5)
  */
 function parseListSheet(rows, companyName) {
@@ -1031,7 +1031,7 @@ async function syncSpreadsheet(token, cfg) {
 
   log(`수집: 입고 ${allData.length}건`, 'ok');
 
-  // List_C01, List_C02, ... 시트 파싱 (TM-NO 품목 목록)
+  // List_* 시트 전체 파싱 (업체별 TM-NO 품목 목록 — List_C01, List_C02, ... 모두 포함)
   const listSheets = sheetNames.filter(n => n.startsWith('List_'));
   log(`List 시트 ${listSheets.length}개 발견`, 'info');
   let allItems = [];
