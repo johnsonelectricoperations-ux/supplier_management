@@ -41,13 +41,17 @@ STATIC_DIR.mkdir(exist_ok=True)
 
 # PDF 파일명 규칙: yyyyMMdd_HHmmss_{TM-NO}_{원본파일명}.pdf
 # 예: 20260302_112637_2000-00A_260302A0_TM2000-00_5_472EA.pdf
-_PDF_NAME_RE = re.compile(r'^\d{8}_\d{6}_([0-9]+-[0-9]+[A-Za-z]*)_')
+_PDF_NAME_RE = re.compile(r'^(\d{8})_\d{6}_([0-9]+-[0-9]+[A-Za-z]*)_')
 
 
-def _extract_tm_no(filename: str) -> str:
-    """파일명에서 TM-NO 추출. 매칭 실패 시 빈 문자열 반환."""
+def _extract_pdf_info(filename: str) -> tuple:
+    """파일명에서 (date: YYYY-MM-DD, tm_no) 추출. 매칭 실패 시 ('', '') 반환."""
     m = _PDF_NAME_RE.match(filename)
-    return m.group(1) if m else ""
+    if not m:
+        return "", ""
+    yyyymmdd = m.group(1)
+    date_str = f"{yyyymmdd[:4]}-{yyyymmdd[4:6]}-{yyyymmdd[6:8]}"
+    return date_str, m.group(2)
 
 # ─── FastAPI 초기화 ───────────────────────────────────
 app = FastAPI(title="검사성적서 관리 시스템", version="1.0.0")
@@ -170,21 +174,39 @@ def sync_pdf(req: PdfSyncRequest):
         file_path = save_dir / req.file_name
         rel_path  = f"{req.company_name}/{req.year}/{req.month}/{req.file_name}"
 
-        # 이미 존재하는 파일이면 다운로드 저장 스킵 (DB 경로만 업데이트)
-        if file_path.exists() and file_path.stat().st_size > 0:
-            tm_no = req.tm_no or _extract_tm_no(req.file_name)
-            if tm_no:
-                conn = db.get_conn()
+        # 파일명에서 날짜 + TM-NO 추출 (날짜 기반 정확 매칭용)
+        file_date, file_tm = _extract_pdf_info(req.file_name)
+        tm_no = req.tm_no or file_tm
+
+        def _update_db_path():
+            """날짜+TM-NO+업체명으로 정확히 매칭하여 local_pdf_path 업데이트."""
+            if not tm_no:
+                return
+            conn = db.get_conn()
+            # 날짜가 있으면 date까지 조건에 포함 → 같은 TM-NO 반복 납품 건 구분
+            if file_date:
+                rows = conn.execute(
+                    """SELECT id FROM incoming_data
+                       WHERE company_name=? AND (tm_no=? OR tm_no=?) AND date=?
+                         AND (local_pdf_path='' OR local_pdf_path IS NULL)
+                       LIMIT 1""",
+                    (req.company_name, tm_no, "TM" + tm_no, file_date)
+                ).fetchall()
+            else:
                 rows = conn.execute(
                     """SELECT id FROM incoming_data
                        WHERE company_name=? AND (tm_no=? OR tm_no=?)
                          AND (local_pdf_path='' OR local_pdf_path IS NULL)
-                       LIMIT 1""",
+                       ORDER BY date DESC LIMIT 1""",
                     (req.company_name, tm_no, "TM" + tm_no)
                 ).fetchall()
-                conn.close()
-                for row in rows:
-                    db.update_local_pdf_path(row["id"], rel_path)
+            conn.close()
+            for row in rows:
+                db.update_local_pdf_path(row["id"], rel_path)
+
+        # 이미 존재하는 파일이면 다운로드 저장 스킵 (DB 경로만 업데이트)
+        if file_path.exists() and file_path.stat().st_size > 0:
+            _update_db_path()
             return {
                 "success": True,
                 "path": rel_path,
@@ -199,16 +221,7 @@ def sync_pdf(req: PdfSyncRequest):
             f.write(file_bytes)
 
         # incoming_data의 local_pdf_path 업데이트
-        tm_no = req.tm_no or _extract_tm_no(req.file_name)
-        if tm_no:
-            conn = db.get_conn()
-            rows = conn.execute(
-                "SELECT id FROM incoming_data WHERE (tm_no=? OR tm_no=?) AND company_name=? LIMIT 1",
-                (tm_no, "TM" + tm_no, req.company_name)
-            ).fetchall()
-            conn.close()
-            for row in rows:
-                db.update_local_pdf_path(row["id"], rel_path)
+        _update_db_path()
 
         return {
             "success": True,
@@ -311,9 +324,10 @@ def get_existing_pdfs():
 @app.post("/api/pdf/rematch")
 def rematch_pdfs():
     """
-    로컬 pdfs 폴더 스캔 → 파일명에서 TM-NO 추출 → incoming_data.local_pdf_path 일괄 업데이트
+    로컬 pdfs 폴더 스캔 → 파일명에서 날짜+TM-NO 추출 → incoming_data.local_pdf_path 일괄 업데이트
     - 폴더 구조: pdfs/{업체명}/{년도}/{월}/{파일명}
     - 파일명 규칙: yyyyMMdd_HHmmss_{TM-NO}_{원본}.pdf
+    - 같은 TM-NO 반복 납품 시 날짜로 구분하여 정확 매칭
     """
     if not PDF_DIR.exists():
         return {"success": True, "matched": 0, "skipped": 0, "already": 0,
@@ -331,19 +345,30 @@ def rematch_pdfs():
 
             company_name = parts[0]
             filename     = parts[-1]
-            tm_no        = _extract_tm_no(filename)
+            file_date, tm_no = _extract_pdf_info(filename)
             if not tm_no:
                 skipped += 1
                 continue
 
             rel_path = str(rel).replace("\\", "/")
 
-            row = conn.execute(
-                """SELECT id, local_pdf_path FROM incoming_data
-                   WHERE company_name=? AND (tm_no=? OR tm_no=?)
-                   LIMIT 1""",
-                (company_name, tm_no, "TM" + tm_no)
-            ).fetchone()
+            # 날짜 + TM-NO + 업체명으로 정확 매칭 (반복 납품 건 구분)
+            if file_date:
+                row = conn.execute(
+                    """SELECT id, local_pdf_path FROM incoming_data
+                       WHERE company_name=? AND (tm_no=? OR tm_no=?) AND date=?
+                       LIMIT 1""",
+                    (company_name, tm_no, "TM" + tm_no, file_date)
+                ).fetchone()
+            else:
+                # 날짜 파싱 실패 시 최신 미매칭 건에 연결
+                row = conn.execute(
+                    """SELECT id, local_pdf_path FROM incoming_data
+                       WHERE company_name=? AND (tm_no=? OR tm_no=?)
+                         AND (local_pdf_path='' OR local_pdf_path IS NULL)
+                       ORDER BY date DESC LIMIT 1""",
+                    (company_name, tm_no, "TM" + tm_no)
+                ).fetchone()
 
             if not row:
                 skipped += 1
