@@ -1,13 +1,20 @@
 @echo off
+chcp 65001 > nul
 cd /d %~dp0
 
 if not exist venv (
-    echo [설치] 가상환경 생성 중...
+    echo [Setup] Creating virtual environment...
     python -m venv venv
+    if errorlevel 1 (
+        echo [Error] Python not found. Please install Python first.
+        pause
+        exit /b 1
+    )
 )
 
-call venv\Scripts\activate
-echo [설치] 패키지 확인 중...
+call venv\Scripts\activate.bat
+
+echo [Setup] Installing packages...
 pip install -q -r requirements.txt
 
 if not exist pdfs mkdir pdfs
@@ -15,10 +22,10 @@ if not exist db mkdir db
 
 echo.
 echo ============================================
-echo   검사성적서 관리 시스템 시작
-echo   접속 주소: http://10.80.101.200:5002
+echo   Inspection Management System
+echo   URL: http://10.80.101.200:5002
 echo ============================================
 echo.
 
-uvicorn main:app --host 0.0.0.0 --port 5002 --workers 1 --access-log --log-level info
+venv\Scripts\uvicorn.exe main:app --host 0.0.0.0 --port 5002 --workers 1 --access-log --log-level info
 pause
