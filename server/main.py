@@ -3,6 +3,7 @@ main.py - FastAPI 서버 (서버PC용)
 접속: http://10.80.101.200:5002
 """
 import os
+import re
 import json
 import base64
 import mimetypes
@@ -37,6 +38,16 @@ def _save_cfg(data: dict):
 
 PDF_DIR.mkdir(exist_ok=True)
 STATIC_DIR.mkdir(exist_ok=True)
+
+# PDF 파일명 규칙: yyyyMMdd_HHmmss_{TM-NO}_{원본파일명}.pdf
+# 예: 20260302_112637_2000-00A_260302A0_TM2000-00_5_472EA.pdf
+_PDF_NAME_RE = re.compile(r'^\d{8}_\d{6}_([0-9]+-[0-9]+[A-Za-z]*)_')
+
+
+def _extract_tm_no(filename: str) -> str:
+    """파일명에서 TM-NO 추출. 매칭 실패 시 빈 문자열 반환."""
+    m = _PDF_NAME_RE.match(filename)
+    return m.group(1) if m else ""
 
 # ─── FastAPI 초기화 ───────────────────────────────────
 app = FastAPI(title="검사성적서 관리 시스템", version="1.0.0")
@@ -157,21 +168,43 @@ def sync_pdf(req: PdfSyncRequest):
         save_dir.mkdir(parents=True, exist_ok=True)
 
         file_path = save_dir / req.file_name
+        rel_path  = f"{req.company_name}/{req.year}/{req.month}/{req.file_name}"
+
+        # 이미 존재하는 파일이면 다운로드 저장 스킵 (DB 경로만 업데이트)
+        if file_path.exists() and file_path.stat().st_size > 0:
+            tm_no = req.tm_no or _extract_tm_no(req.file_name)
+            if tm_no:
+                conn = db.get_conn()
+                rows = conn.execute(
+                    """SELECT id FROM incoming_data
+                       WHERE company_name=? AND (tm_no=? OR tm_no=?)
+                         AND (local_pdf_path='' OR local_pdf_path IS NULL)
+                       LIMIT 1""",
+                    (req.company_name, tm_no, "TM" + tm_no)
+                ).fetchall()
+                conn.close()
+                for row in rows:
+                    db.update_local_pdf_path(row["id"], rel_path)
+            return {
+                "success": True,
+                "path": rel_path,
+                "size": file_path.stat().st_size,
+                "message": f"{req.file_name} 이미 존재 (스킵)",
+                "skipped": True,
+            }
 
         # base64 디코딩 후 저장
         file_bytes = base64.b64decode(req.file_data)
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
-        # 상대 경로 (API 서빙용)
-        rel_path = f"{req.company_name}/{req.year}/{req.month}/{req.file_name}"
-
-        # incoming_data의 local_pdf_path 업데이트 (tm_no 기준)
-        if req.tm_no:
+        # incoming_data의 local_pdf_path 업데이트
+        tm_no = req.tm_no or _extract_tm_no(req.file_name)
+        if tm_no:
             conn = db.get_conn()
             rows = conn.execute(
-                "SELECT id FROM incoming_data WHERE tm_no=? AND company_name=? LIMIT 1",
-                (req.tm_no, req.company_name)
+                "SELECT id FROM incoming_data WHERE (tm_no=? OR tm_no=?) AND company_name=? LIMIT 1",
+                (tm_no, "TM" + tm_no, req.company_name)
             ).fetchall()
             conn.close()
             for row in rows:
@@ -181,7 +214,8 @@ def sync_pdf(req: PdfSyncRequest):
             "success": True,
             "path": rel_path,
             "size": len(file_bytes),
-            "message": f"{req.file_name} 저장 완료"
+            "message": f"{req.file_name} 저장 완료",
+            "skipped": False,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -262,6 +296,79 @@ def serve_pdf(file_path: str):
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{full_path.name}"'}
     )
+
+
+@app.get("/api/pdf/existing")
+def get_existing_pdfs():
+    """
+    서버에 이미 저장된 PDF 파일명 목록 반환
+    - JS 동기화 시 중복 다운로드 방지용
+    """
+    files = [f.name for f in PDF_DIR.rglob("*.pdf")] if PDF_DIR.exists() else []
+    return {"success": True, "files": files}
+
+
+@app.post("/api/pdf/rematch")
+def rematch_pdfs():
+    """
+    로컬 pdfs 폴더 스캔 → 파일명에서 TM-NO 추출 → incoming_data.local_pdf_path 일괄 업데이트
+    - 폴더 구조: pdfs/{업체명}/{년도}/{월}/{파일명}
+    - 파일명 규칙: yyyyMMdd_HHmmss_{TM-NO}_{원본}.pdf
+    """
+    if not PDF_DIR.exists():
+        return {"success": True, "matched": 0, "skipped": 0, "already": 0,
+                "message": "pdfs 폴더 없음"}
+
+    matched = skipped = already = 0
+    conn = db.get_conn()
+    try:
+        for pdf_file in sorted(PDF_DIR.rglob("*.pdf")):
+            rel   = pdf_file.relative_to(PDF_DIR)
+            parts = list(rel.parts)
+            if len(parts) < 4:           # {업체}/{년}/{월}/{파일} 최소 4단계
+                skipped += 1
+                continue
+
+            company_name = parts[0]
+            filename     = parts[-1]
+            tm_no        = _extract_tm_no(filename)
+            if not tm_no:
+                skipped += 1
+                continue
+
+            rel_path = str(rel).replace("\\", "/")
+
+            row = conn.execute(
+                """SELECT id, local_pdf_path FROM incoming_data
+                   WHERE company_name=? AND (tm_no=? OR tm_no=?)
+                   LIMIT 1""",
+                (company_name, tm_no, "TM" + tm_no)
+            ).fetchone()
+
+            if not row:
+                skipped += 1
+                continue
+
+            if row["local_pdf_path"] == rel_path:
+                already += 1
+            else:
+                conn.execute(
+                    "UPDATE incoming_data SET local_pdf_path=? WHERE id=?",
+                    (rel_path, row["id"])
+                )
+                matched += 1
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "success": True,
+        "matched": matched,
+        "already": already,
+        "skipped": skipped,
+        "message": f"매칭 완료: {matched}건 업데이트, {already}건 이미 매칭, {skipped}건 스킵"
+    }
 
 
 @app.get("/api/pdf-list/{company_name}")

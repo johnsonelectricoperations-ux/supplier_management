@@ -306,6 +306,9 @@
           <button class="btn btn-outline" onclick="syncPdfOnly()">
             PDF만 동기화
           </button>
+          <button class="btn btn-outline" id="btnRematch" onclick="rematchPdfs()" title="로컬 저장된 PDF를 스캔하여 TM-NO 기반으로 이력과 자동 연결">
+            🔗 PDF 재매칭
+          </button>
         </div>
 
         <div class="progress-wrap" id="progressWrap" style="display:none;">
@@ -999,11 +1002,22 @@ async function syncDrivePdfs(token, cfg) {
   setProgress(62, 'Drive PDF 목록 조회 중...');
   log('Drive 폴더 조회 중: 검사성적서/[업체]/[년도]/[월]', 'info');
 
+  // 서버에 이미 저장된 파일명 목록 가져오기 (중복 다운로드 방지)
+  let existingFiles = new Set();
+  try {
+    const existRes  = await fetch('/api/pdf/existing');
+    const existJson = await existRes.json();
+    existingFiles   = new Set(existJson.files || []);
+    log(`서버 기존 PDF: ${existingFiles.size}개 (다운로드 스킵 대상)`, 'info');
+  } catch(e) {
+    log('기존 파일 목록 조회 실패 (전체 다운로드 진행)', 'warn');
+  }
+
   // 업체 폴더 목록
   const companies = await listSubFolders(token, cfg.folderId || cfg.folder_id);
   log(`업체 폴더: ${companies.map(c=>c.name).join(', ')}`, 'info');
 
-  let totalPdf = 0, savedPdf = 0;
+  let totalPdf = 0, savedPdf = 0, skippedPdf = 0;
 
   for (const company of companies) {
     // 년도 폴더
@@ -1019,15 +1033,22 @@ async function syncDrivePdfs(token, cfg) {
 
         for (const file of files) {
           try {
-            setProgress(65 + (savedPdf / Math.max(totalPdf,1) * 30),
+            // 이미 서버에 존재하는 파일은 다운로드 스킵
+            if (existingFiles.has(file.name)) {
+              log(`스킵 (이미 존재): ${file.name}`, 'info');
+              skippedPdf++;
+              continue;
+            }
+
+            setProgress(65 + (savedPdf / Math.max(totalPdf - skippedPdf, 1) * 30),
               `PDF 다운로드: ${file.name}`);
             log(`다운로드: ${file.name}`, 'info');
 
-            const buf    = await downloadFile(token, file.id);
-            const b64    = bufferToBase64(buf);
+            const buf = await downloadFile(token, file.id);
+            const b64 = bufferToBase64(buf);
 
-            // TM-NO 추출 시도 (파일명에서: 날짜_TMNO_원본.pdf 패턴)
-            const tmNoMatch = file.name.match(/_([A-Z0-9\-]+)_/);
+            // TM-NO 추출: yyyyMMdd_HHmmss_{TM-NO}_{원본}.pdf 패턴
+            const tmNoMatch = file.name.match(/^\d{8}_\d{6}_([0-9]+-[0-9]+[A-Za-z]*)_/);
             const tmNo = tmNoMatch ? tmNoMatch[1] : '';
 
             const res = await fetch('/api/sync/pdf', {
@@ -1058,8 +1079,32 @@ async function syncDrivePdfs(token, cfg) {
     }
   }
 
-  log(`PDF 동기화 완료: ${savedPdf}/${totalPdf}건 저장`, 'ok');
+  log(`PDF 동기화 완료: ${savedPdf}건 신규 저장, ${skippedPdf}건 스킵 (이미 존재)`, 'ok');
   setProgress(95, 'PDF 동기화 완료');
+}
+
+async function rematchPdfs() {
+  if (syncRunning) { alert('동기화 진행 중에는 사용할 수 없습니다.'); return; }
+  const btn = document.getElementById('btnRematch');
+  btn.disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('logBox').innerHTML = '';
+  setProgress(10, 'PDF 재매칭 중...');
+  log('로컬 PDF 파일 스캔 및 TM-NO 매칭 시작...', 'info');
+  try {
+    const res  = await fetch('/api/pdf/rematch', { method: 'POST' });
+    const json = await res.json();
+    if (json.success) {
+      setProgress(100, '재매칭 완료');
+      log(`✅ ${json.message}`, 'ok');
+    } else {
+      log(`❌ 재매칭 실패: ${json.detail}`, 'err');
+    }
+  } catch(e) {
+    log(`❌ 오류: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ════════════════════════════════════════
