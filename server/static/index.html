@@ -977,24 +977,17 @@ function parseDataSheet(rows, companyName) {
     updated_at:   row[11] || '',
   })).filter(r => r.id && r.company_name);
 
-  // 자연키 중복 제거: 같은 (date, company_name, tm_no, quantity, created_at) = 중복으로 판단
-  // pdf_url 있는 행 우선, 없으면 먼저 파싱된 행 유지
-  const naturalMap = new Map();
+  // ID 기반 중복 제거만 수행 (스프레드시트 동일 ID 행이 있을 경우 마지막 것 유지)
+  // 자연키 dedup 사용 안 함: 같은 날/시간/TM-NO/수량이라도 ID가 다르면 별개 납품건(예: 동일 배치 2회)
+  const idMap = new Map();
   for (const r of parsed) {
-    const key = `${r.date}||${r.company_name}||${r.tm_no}||${r.quantity}||${r.time}||${r.created_at}`;
-    if (!naturalMap.has(key)) {
-      naturalMap.set(key, r);
-    } else if (r.pdf_url && !naturalMap.get(key).pdf_url) {
-      // pdf_url 있는 버전으로 교체
-      naturalMap.set(key, r);
+    const prev = idMap.get(r.id);
+    // pdf_url 있는 행 우선, 없으면 나중 행으로 갱신
+    if (!prev || (r.pdf_url && !prev.pdf_url)) {
+      idMap.set(r.id, r);
     }
   }
-
-  const deduped = Array.from(naturalMap.values());
-  if (parsed.length !== deduped.length) {
-    console.warn(`[parseDataSheet] 중복 제거: ${parsed.length - deduped.length}건 제거 (${companyName})`);
-  }
-  return deduped;
+  return Array.from(idMap.values());
 }
 
 /**

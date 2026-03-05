@@ -232,48 +232,31 @@ def upsert_item_list(rows: List[Dict]) -> int:
 
 def remove_incoming_duplicates() -> int:
     """
-    자연키 (date, company_name, tm_no, quantity, created_at) 기준 중복 제거.
-    같은 날짜·업체·TM-NO·수량·등록일시가 동일한 행 중 rowid가 가장 작은 행(최초 입력)만 보존.
-    보존할 행에 pdf_url이 없으나 중복 행 중 pdf_url이 있는 경우 pdf_url을 복사 후 삭제.
+    동일 ID 중복 행 제거 (id PRIMARY KEY 충돌 외에 혹시 남은 경우 대비).
+    같은 id 중 pdf_url이 있는 행 우선 보존, 없으면 rowid가 작은(먼저 입력된) 행 보존.
+    주의: 날짜/업체/TM-NO/수량이 같아도 id가 다르면 별개 납품건이므로 건드리지 않음.
     """
     conn = get_conn()
     c = conn.cursor()
 
-    # 1단계: pdf_url을 가진 행의 값을 같은 그룹의 대표(min rowid) 행에 복사
+    # 동일 id 중 pdf_url 있는 행의 값을 대표 행에 복사
     c.execute("""
         UPDATE incoming_data
         SET pdf_url = (
             SELECT i2.pdf_url FROM incoming_data i2
-            WHERE i2.date = incoming_data.date
-              AND i2.company_name = incoming_data.company_name
-              AND i2.tm_no = incoming_data.tm_no
-              AND i2.quantity = incoming_data.quantity
-              AND COALESCE(NULLIF(i2.time,''), '__') = COALESCE(NULLIF(incoming_data.time,''), '__')
-              AND COALESCE(NULLIF(i2.created_at,''), '__') = COALESCE(NULLIF(incoming_data.created_at,''), '__')
+            WHERE i2.id = incoming_data.id
               AND i2.pdf_url != '' AND i2.pdf_url IS NOT NULL
             LIMIT 1
         )
         WHERE (pdf_url = '' OR pdf_url IS NULL)
-          AND rowid = (
-            SELECT MIN(rowid) FROM incoming_data i3
-            WHERE i3.date = incoming_data.date
-              AND i3.company_name = incoming_data.company_name
-              AND i3.tm_no = incoming_data.tm_no
-              AND i3.quantity = incoming_data.quantity
-              AND COALESCE(NULLIF(i3.time,''), '__') = COALESCE(NULLIF(incoming_data.time,''), '__')
-              AND COALESCE(NULLIF(i3.created_at,''), '__') = COALESCE(NULLIF(incoming_data.created_at,''), '__')
-          )
+          AND rowid = (SELECT MIN(rowid) FROM incoming_data i3 WHERE i3.id = incoming_data.id)
     """)
 
-    # 2단계: 중복 행 삭제 (그룹별 min rowid만 유지)
+    # 동일 id 중 min rowid 외 삭제
     c.execute("""
         DELETE FROM incoming_data
         WHERE rowid NOT IN (
-            SELECT MIN(rowid)
-            FROM incoming_data
-            GROUP BY date, company_name, tm_no, quantity,
-                     COALESCE(NULLIF(time,''), '__'),
-                     COALESCE(NULLIF(created_at,''), '__')
+            SELECT MIN(rowid) FROM incoming_data GROUP BY id
         )
     """)
     removed = c.rowcount
