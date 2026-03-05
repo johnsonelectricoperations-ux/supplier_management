@@ -1205,6 +1205,31 @@ async function syncPdfByUrl(token) {
   log(`pdf_url 직접 다운로드 완료: ${done}건 처리`, 'ok');
 }
 
+/**
+ * 동기화 날짜 범위 계산
+ * - 평상시(6일~): 이번달만
+ * - 매월 1~5일: 이번달 + 전달 마지막 2일(말일-1일 ~ 말일)
+ */
+function getSyncDateRange() {
+  const now        = new Date();
+  const curYear    = now.getFullYear();
+  const curMonth   = now.getMonth() + 1;
+  const curDay     = now.getDate();
+  const prevMonth  = curMonth === 1 ? 12 : curMonth - 1;
+  const prevYear   = curMonth === 1 ? curYear - 1 : curYear;
+
+  const includesPrev = curDay <= 5;
+  // 전달 말일 (실제 일수)
+  const prevLastDay  = new Date(curYear, curMonth - 1, 0).getDate();
+  // 전달 마지막 2일의 시작 날짜 (말일-1일)
+  const prevFrom = includesPrev
+    ? `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(prevLastDay - 1).padStart(2,'0')}`
+    : null;
+  const curMonthStr = `${curYear}-${String(curMonth).padStart(2,'0')}`;
+
+  return { curYear, curMonth, prevMonth, prevYear, includesPrev, prevFrom, curMonthStr };
+}
+
 async function syncSpreadsheet(token, cfg) {
   const sheetId = cfg.sheetId || cfg.sheet_id;
   log('스프레드시트 시트 목록 조회 중...', 'info');
@@ -1239,7 +1264,17 @@ async function syncSpreadsheet(token, cfg) {
     setProgress(10 + (done / dataSheets.length * 45), `${name} 읽기 완료`);
   }
 
-  log(`수집: 입고 ${allData.length}건`, 'ok');
+  // 날짜 필터: 이번달 + (1~5일에는 전달 마지막 2일)
+  const { curMonthStr, includesPrev, prevFrom } = getSyncDateRange();
+  const filteredData = allData.filter(r => {
+    if (!r.date) return false;
+    if (r.date.startsWith(curMonthStr)) return true;
+    if (includesPrev && prevFrom && r.date >= prevFrom) return true;
+    return false;
+  });
+  log(`수집: 입고 ${allData.length}건 → 날짜 필터 후 ${filteredData.length}건` +
+      (includesPrev ? ` (전달 ${prevFrom} 이후 포함)` : ' (이번달만)'), 'ok');
+  allData = filteredData;
 
   // List_* 시트 전체 파싱 (업체별 TM-NO 품목 목록 — List_C01, List_C02, ... 모두 포함)
   const listSheets = sheetNames.filter(n => n.startsWith('List_'));
@@ -1296,19 +1331,20 @@ async function syncDrivePdfs(token, cfg, lastSyncTime = null) {
   setProgress(62, 'Drive PDF 목록 조회 중...');
   log('Drive 폴더 조회 중: 검사성적서/[업체]/[년도]/[월]', 'info');
 
-  // 현재 년/월 계산 (현재 월 + 전월까지만 탐색)
-  const now        = new Date();
-  const curYear    = now.getFullYear();
-  const curMonth   = now.getMonth() + 1;
-  const prevMonth  = curMonth === 1 ? 12 : curMonth - 1;
-  const prevMonthYear = curMonth === 1 ? curYear - 1 : curYear;
-  const targetYears  = new Set([String(curYear), String(prevMonthYear)]);
-  const targetMonths = new Set([curMonth, prevMonth]);
+  // 탐색 범위: 이번달, 매월 1~5일에는 전달도 포함
+  const { curYear, curMonth, prevMonth, prevYear, includesPrev } = getSyncDateRange();
+  const targetYears  = new Set([String(curYear)]);
+  const targetMonths = new Set([curMonth]);
+  if (includesPrev) {
+    targetYears.add(String(prevYear));
+    targetMonths.add(prevMonth);
+  }
 
   if (lastSyncTime) {
     log(`증분 동기화: ${lastSyncTime} 이후 변경된 파일만 처리`, 'info');
   }
-  log(`탐색 범위: ${[...targetYears].join('/')}년도, ${[...targetMonths].map(m => String(m).padStart(2,'0')).join('/')}월`, 'info');
+  log(`탐색 범위: ${[...targetYears].join('/')}년도, ${[...targetMonths].map(m => String(m).padStart(2,'0')).join('/')}월` +
+      (includesPrev ? ' (월초 — 전달 포함)' : ''), 'info');
 
   // 서버에 이미 저장된 파일명 목록 가져오기 (중복 다운로드 방지)
   let existingFiles = new Set();
