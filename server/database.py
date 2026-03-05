@@ -230,6 +230,20 @@ def upsert_item_list(rows: List[Dict]) -> int:
     return count
 
 
+def get_unmatched_pdf_records() -> List[Dict]:
+    """pdf_url은 있으나 local_pdf_path가 없는 레코드 반환 (Drive 직접 다운로드용)"""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT id, company_name, tm_no, date, pdf_url
+           FROM incoming_data
+           WHERE pdf_url != '' AND pdf_url IS NOT NULL
+             AND (local_pdf_path = '' OR local_pdf_path IS NULL)
+           ORDER BY date DESC"""
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def update_local_pdf_path(incoming_id: str, local_path: str):
     conn = get_conn()
     conn.execute(

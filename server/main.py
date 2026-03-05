@@ -106,6 +106,32 @@ def save_config(req: AppConfigRequest):
     return {"success": True, "message": "설정이 서버에 저장되었습니다."}
 
 
+_DEFAULT_ADMIN_PASSWORD = "admin1234"
+
+@app.post("/api/admin/verify")
+def verify_admin_password(body: dict):
+    """관리자 암호 확인"""
+    cfg = _load_cfg()
+    stored = cfg.get("admin_password", _DEFAULT_ADMIN_PASSWORD)
+    if body.get("password") == stored:
+        return {"success": True}
+    raise HTTPException(status_code=401, detail="암호가 올바르지 않습니다.")
+
+@app.post("/api/admin/password")
+def change_admin_password(body: dict):
+    """관리자 암호 변경"""
+    cfg = _load_cfg()
+    stored = cfg.get("admin_password", _DEFAULT_ADMIN_PASSWORD)
+    if body.get("current_password") != stored:
+        raise HTTPException(status_code=401, detail="현재 암호가 올바르지 않습니다.")
+    new_pw = body.get("new_password", "").strip()
+    if len(new_pw) < 4:
+        raise HTTPException(status_code=400, detail="암호는 4자 이상이어야 합니다.")
+    cfg["admin_password"] = new_pw
+    _save_cfg(cfg)
+    return {"success": True, "message": "암호가 변경되었습니다."}
+
+
 @app.get("/api/service-account")
 def get_service_account():
     """서비스 계정 키 정보 반환 (사내망 전용)"""
@@ -234,6 +260,13 @@ def sync_pdf(req: PdfSyncRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/pdf/unmatched")
+def get_unmatched_pdfs():
+    """pdf_url은 있으나 local_pdf_path가 없는 레코드 반환 (Drive 직접 다운로드용)"""
+    rows = db.get_unmatched_pdf_records()
+    return {"success": True, "data": rows, "count": len(rows)}
 
 
 @app.get("/api/sync/status")
