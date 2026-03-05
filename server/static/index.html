@@ -981,7 +981,7 @@ function parseDataSheet(rows, companyName) {
   // pdf_url 있는 행 우선, 없으면 먼저 파싱된 행 유지
   const naturalMap = new Map();
   for (const r of parsed) {
-    const key = `${r.date}||${r.company_name}||${r.tm_no}||${r.quantity}||${r.created_at}`;
+    const key = `${r.date}||${r.company_name}||${r.tm_no}||${r.quantity}||${r.time}||${r.created_at}`;
     if (!naturalMap.has(key)) {
       naturalMap.set(key, r);
     } else if (r.pdf_url && !naturalMap.get(key).pdf_url) {

@@ -248,6 +248,7 @@ def remove_incoming_duplicates() -> int:
               AND i2.company_name = incoming_data.company_name
               AND i2.tm_no = incoming_data.tm_no
               AND i2.quantity = incoming_data.quantity
+              AND COALESCE(NULLIF(i2.time,''), '__') = COALESCE(NULLIF(incoming_data.time,''), '__')
               AND COALESCE(NULLIF(i2.created_at,''), '__') = COALESCE(NULLIF(incoming_data.created_at,''), '__')
               AND i2.pdf_url != '' AND i2.pdf_url IS NOT NULL
             LIMIT 1
@@ -259,6 +260,7 @@ def remove_incoming_duplicates() -> int:
               AND i3.company_name = incoming_data.company_name
               AND i3.tm_no = incoming_data.tm_no
               AND i3.quantity = incoming_data.quantity
+              AND COALESCE(NULLIF(i3.time,''), '__') = COALESCE(NULLIF(incoming_data.time,''), '__')
               AND COALESCE(NULLIF(i3.created_at,''), '__') = COALESCE(NULLIF(incoming_data.created_at,''), '__')
           )
     """)
@@ -270,6 +272,7 @@ def remove_incoming_duplicates() -> int:
             SELECT MIN(rowid)
             FROM incoming_data
             GROUP BY date, company_name, tm_no, quantity,
+                     COALESCE(NULLIF(time,''), '__'),
                      COALESCE(NULLIF(created_at,''), '__')
         )
     """)
