@@ -288,8 +288,8 @@ def dedup_incoming():
 
 @app.get("/api/pdf/unmatched")
 def get_unmatched_pdfs():
-    """pdf_url은 있으나 local_pdf_path가 없는 레코드 반환 (Drive 직접 다운로드용)"""
-    rows = db.get_unmatched_pdf_records()
+    """pdf_url은 있으나 local_pdf_path가 없거나 실제 파일이 없는 레코드 반환 (Drive 직접 다운로드용)"""
+    rows = db.get_unmatched_pdf_records(pdf_base_dir=str(PDF_DIR))
     return {"success": True, "data": rows, "count": len(rows)}
 
 

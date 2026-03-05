@@ -265,18 +265,29 @@ def remove_incoming_duplicates() -> int:
     return removed
 
 
-def get_unmatched_pdf_records() -> List[Dict]:
-    """pdf_url은 있으나 local_pdf_path가 없는 레코드 반환 (Drive 직접 다운로드용)"""
+def get_unmatched_pdf_records(pdf_base_dir: str = "") -> List[Dict]:
+    """pdf_url은 있으나 local_pdf_path가 없거나 실제 파일이 없는 레코드 반환 (Drive 직접 다운로드용)"""
+    from pathlib import Path
     conn = get_conn()
     rows = conn.execute(
-        """SELECT id, company_name, tm_no, date, pdf_url
+        """SELECT id, company_name, tm_no, date, pdf_url, local_pdf_path
            FROM incoming_data
            WHERE pdf_url != '' AND pdf_url IS NOT NULL
-             AND (local_pdf_path = '' OR local_pdf_path IS NULL)
            ORDER BY date DESC"""
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        path = d.get("local_pdf_path") or ""
+        if not path:
+            result.append(d)
+        elif pdf_base_dir:
+            # DB 경로가 있어도 실제 파일이 삭제된 경우 재다운로드 대상에 포함
+            full = Path(pdf_base_dir) / path
+            if not full.exists():
+                result.append(d)
+    return result
 
 
 def update_local_pdf_path(incoming_id: str, local_path: str):
