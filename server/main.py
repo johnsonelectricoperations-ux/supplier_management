@@ -262,6 +262,17 @@ def sync_pdf(req: PdfSyncRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/db/dedup")
+def dedup_incoming():
+    """입고 데이터 중복 제거 (자연키 기준)"""
+    try:
+        removed = db.remove_incoming_duplicates()
+        return {"success": True, "removed": removed,
+                "message": f"중복 {removed}건 제거 완료"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/pdf/unmatched")
 def get_unmatched_pdfs():
     """pdf_url은 있으나 local_pdf_path가 없는 레코드 반환 (Drive 직접 다운로드용)"""

@@ -962,7 +962,7 @@ function parseUsersSheet(rows) {
  */
 function parseDataSheet(rows, companyName) {
   if (rows.length < 2) return [];
-  return rows.slice(1).map(row => ({
+  const parsed = rows.slice(1).map(row => ({
     id:           row[1] || '',
     company_code: row[0] || '',
     company_name: row[2] || companyName,
@@ -976,6 +976,25 @@ function parseDataSheet(rows, companyName) {
     created_by:   row[10] || '',
     updated_at:   row[11] || '',
   })).filter(r => r.id && r.company_name);
+
+  // 자연키 중복 제거: 같은 (date, company_name, tm_no, quantity, created_at) = 중복으로 판단
+  // pdf_url 있는 행 우선, 없으면 먼저 파싱된 행 유지
+  const naturalMap = new Map();
+  for (const r of parsed) {
+    const key = `${r.date}||${r.company_name}||${r.tm_no}||${r.quantity}||${r.created_at}`;
+    if (!naturalMap.has(key)) {
+      naturalMap.set(key, r);
+    } else if (r.pdf_url && !naturalMap.get(key).pdf_url) {
+      // pdf_url 있는 버전으로 교체
+      naturalMap.set(key, r);
+    }
+  }
+
+  const deduped = Array.from(naturalMap.values());
+  if (parsed.length !== deduped.length) {
+    console.warn(`[parseDataSheet] 중복 제거: ${parsed.length - deduped.length}건 제거 (${companyName})`);
+  }
+  return deduped;
 }
 
 /**
@@ -1088,6 +1107,16 @@ async function startFullSync() {
 
     // 4. pdf_url 직접 다운로드 (Drive 폴더에 없는 PDF 보완)
     await syncPdfByUrl(token);
+
+    // 5. 중복 데이터 정리 (스프레드시트 중복 행 방지)
+    setProgress(99, '중복 데이터 정리 중...');
+    try {
+      const dedupRes  = await fetch('/api/db/dedup', { method: 'POST' });
+      const dedupJson = await dedupRes.json();
+      if (dedupJson.removed > 0) {
+        log(`🧹 중복 ${dedupJson.removed}건 자동 제거됨 (동일 날짜·업체·TM-NO·수량)`, 'warn');
+      }
+    } catch(e) { /* 중복 제거 실패는 무시 */ }
 
     setProgress(100, '동기화 완료!');
     log('✅ 모든 동기화 완료', 'ok');
