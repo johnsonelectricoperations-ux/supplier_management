@@ -207,11 +207,24 @@ def sync_pdf(req: PdfSyncRequest):
         tm_no = req.tm_no or file_tm
 
         def _update_db_path():
-            """날짜+TM-NO+업체명으로 정확히 매칭하여 local_pdf_path 업데이트."""
-            if not tm_no:
-                return
+            """local_pdf_path 업데이트.
+            incoming_id가 있으면 해당 레코드에 직접 매칭 (동일 TM-NO 복수 배치 정확 연결).
+            없으면 날짜+TM-NO+업체명으로 미매칭 레코드 중 첫 번째에 연결.
+            """
             conn = db.get_conn()
-            # 날짜가 있으면 date까지 조건에 포함 → 같은 TM-NO 반복 납품 건 구분
+            if req.incoming_id:
+                # 레코드 ID 직접 지정 → 정확한 1:1 연결
+                conn.execute(
+                    "UPDATE incoming_data SET local_pdf_path=? WHERE id=?",
+                    (rel_path, req.incoming_id)
+                )
+                conn.commit()
+                conn.close()
+                return
+            if not tm_no:
+                conn.close()
+                return
+            # fallback: 날짜+TM-NO 기반 순차 매칭
             if file_date:
                 rows = conn.execute(
                     """SELECT id FROM incoming_data

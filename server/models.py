@@ -63,6 +63,7 @@ class PdfSyncRequest(BaseModel):
     file_data: str          # base64 encoded
     google_file_id: str = ""
     tm_no: str = ""
+    incoming_id: str = ""   # 지정 시 해당 레코드에 직접 매칭 (동일 TM-NO 복수 배치 구분용)
 
 
 class AppConfigRequest(BaseModel):

@@ -1167,9 +1167,10 @@ async function syncPdfByUrl(token) {
       const buf  = await downloadFile(token, fileId);
       const b64  = bufferToBase64(buf);
 
-      // 파일명: date_tmno.pdf 형태로 생성
-      const datePart = (rec.date || '').replace(/-/g, '');
-      const fileName = `${datePart}_${rec.tm_no.replace(/[^a-zA-Z0-9-]/g,'_')}_url.pdf`;
+      // 파일명: fileId 앞 8자리 포함 → 같은 날/TM-NO 복수 배치도 고유 파일명 보장
+      const datePart  = (rec.date || '').replace(/-/g, '');
+      const fileIdShort = fileId.slice(0, 8);
+      const fileName  = `${datePart}_${rec.tm_no.replace(/[^a-zA-Z0-9-]/g,'_')}_${fileIdShort}.pdf`;
 
       // 업체 폴더 / 년 / 월 구성
       const dateObj  = rec.date ? new Date(rec.date) : new Date();
@@ -1187,6 +1188,7 @@ async function syncPdfByUrl(token) {
           file_data:      b64,
           google_file_id: fileId,
           tm_no:          rec.tm_no,
+          incoming_id:    rec.id,   // 레코드 직접 지정 → 복수 배치 정확 연결
         }),
       });
       const json = await res.json();
