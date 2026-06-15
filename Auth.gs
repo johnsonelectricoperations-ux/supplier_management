@@ -393,6 +393,11 @@ function generateSessionToken() {
  */
 function createSession(userId, userData) {
   try {
+    // 10% 확률로 만료 세션 자동 정리 (로그인마다 매번 실행하면 느려지므로 확률적으로)
+    if (Math.random() < 0.1) {
+      cleanupExpiredSessions();
+    }
+
     const token = generateSessionToken();
     const sessionData = {
       token: token,
@@ -409,7 +414,7 @@ function createSession(userId, userData) {
     const cache = CacheService.getScriptCache();
     cache.put('session_' + token, JSON.stringify(sessionData), 21600); // 6시간
 
-    // ScriptProperties에도 저장 (백업, 장기 보관)
+    // ScriptProperties에도 저장 (캐시 만료 시 복구용 백업)
     const scriptProps = PropertiesService.getScriptProperties();
     scriptProps.setProperty('session_' + token, JSON.stringify(sessionData));
 
@@ -539,7 +544,8 @@ function deleteSessionByToken(token) {
 }
 
 /**
- * 만료된 세션 정리 (정기적으로 실행)
+ * 만료된 세션 정리 (시간 기반 트리거로 자동 실행 또는 수동 실행)
+ * Apps Script 트리거 설정: setupCleanupTrigger() 함수를 한 번 실행하면 자동 등록됨
  */
 function cleanupExpiredSessions() {
   try {
@@ -547,9 +553,11 @@ function cleanupExpiredSessions() {
     const allProps = scriptProps.getProperties();
     const currentTime = new Date().getTime();
     let cleanupCount = 0;
+    let totalSessionCount = 0;
 
     for (const key in allProps) {
       if (key.startsWith('session_')) {
+        totalSessionCount++;
         try {
           const sessionData = JSON.parse(allProps[key]);
           const lastActivity = sessionData.lastActivity || sessionData.loginTime;
@@ -561,18 +569,20 @@ function cleanupExpiredSessions() {
             cleanupCount++;
           }
         } catch (e) {
-          // 잘못된 형식의 데이터는 삭제
+          // 파싱 불가한 잘못된 데이터 삭제
           scriptProps.deleteProperty(key);
           cleanupCount++;
         }
       }
     }
 
-    Logger.log('만료된 세션 정리 완료: ' + cleanupCount + '개');
+    const remainingCount = totalSessionCount - cleanupCount;
+    Logger.log(`세션 정리 완료 - 삭제: ${cleanupCount}개, 잔여: ${remainingCount}개`);
 
     return {
       success: true,
-      cleanupCount: cleanupCount
+      cleanupCount: cleanupCount,
+      remainingCount: remainingCount
     };
 
   } catch (error) {
@@ -580,6 +590,66 @@ function cleanupExpiredSessions() {
     return {
       success: false,
       message: '세션 정리 중 오류가 발생했습니다.'
+    };
+  }
+}
+
+/**
+ * [최초 1회 실행] 1시간마다 세션 자동 정리 트리거 등록
+ * Apps Script 편집기에서 이 함수를 직접 실행하면 자동 정리가 설정됩니다.
+ * 중복 등록 방지를 위해 기존 동일 트리거는 먼저 삭제합니다.
+ */
+function setupCleanupTrigger() {
+  // 기존 cleanupExpiredSessions 트리거 모두 삭제 (중복 방지)
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'cleanupExpiredSessions') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  // 1시간마다 자동 실행 트리거 등록
+  ScriptApp.newTrigger('cleanupExpiredSessions')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  Logger.log('세션 자동 정리 트리거 등록 완료 (1시간 주기)');
+  return { success: true, message: '1시간 주기 자동 정리 트리거가 등록되었습니다.' };
+}
+
+/**
+ * [긴급 복구용] ScriptProperties의 모든 세션 데이터를 강제 삭제
+ * "속성 저장용량 한도 초과" 에러 발생 시 이 함수를 실행하면 즉시 복구됩니다.
+ * 실행 중인 모든 세션이 종료되므로 사용자 전원이 재로그인해야 합니다.
+ */
+function emergencyCleanAllSessions() {
+  try {
+    const scriptProps = PropertiesService.getScriptProperties();
+    const allProps = scriptProps.getProperties();
+    let deletedCount = 0;
+
+    for (const key in allProps) {
+      if (key.startsWith('session_')) {
+        scriptProps.deleteProperty(key);
+        deletedCount++;
+      }
+    }
+
+    // CacheService도 함께 초기화
+    CacheService.getScriptCache().removeAll(Object.keys(allProps).filter(k => k.startsWith('session_')));
+
+    Logger.log(`긴급 세션 전체 삭제 완료: ${deletedCount}개`);
+    return {
+      success: true,
+      message: `세션 ${deletedCount}개가 삭제되었습니다. 사용자들이 재로그인해야 합니다.`,
+      deletedCount: deletedCount
+    };
+
+  } catch (error) {
+    logError('emergencyCleanAllSessions', error);
+    return {
+      success: false,
+      message: '긴급 세션 삭제 중 오류가 발생했습니다: ' + error.toString()
     };
   }
 }
